@@ -20,10 +20,11 @@ model User {
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 
-  memberships       Membership[]
-  householdsCreated Household[]     @relation("HouseholdCreator")
-  preferences       UserPreference?
-  members           Member[]
+  memberships         Membership[]
+  householdsCreated   Household[]     @relation("HouseholdCreator")
+  preferences         UserPreference?
+  members             Member[]
+  webauthnCredentials WebAuthnCredential[]
 }
 
 model Household {
@@ -171,6 +172,42 @@ model PurchaseItem {
   kitchen Kitchen @relation(fields: [kitchenId], references: [id], onDelete: Cascade)
 
   @@index([kitchenId])
+}
+
+model WebAuthnCredential {
+  id           String    @id @default(cuid())
+  userId       String
+  /// Base64URL credential id
+  credentialId String    @unique
+  publicKey    Bytes
+  counter      BigInt    @default(0)
+  deviceType   String?
+  backedUp     Boolean   @default(false)
+  /// JSON string array of AuthenticatorTransport
+  transports   String?
+  nickname     String?
+  createdAt    DateTime  @default(now())
+  lastUsedAt   DateTime?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+/// Short-lived WebAuthn challenges (registration / authentication)
+model WebAuthnChallenge {
+  id        String   @id @default(cuid())
+  /// registration | authentication
+  type      String
+  challenge String   @unique
+  userId    String?
+  email     String?
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  @@index([expiresAt])
+  @@index([userId])
+  @@index([email])
 }
 
 /// Sliding-window rate limit counters (works on serverless without Redis)

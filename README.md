@@ -16,6 +16,8 @@ npm run dev
 
 On Vercel set `DATABASE_URL`, `DIRECT_URL`, and `AUTH_SECRET` (min 16 chars) for Production and Builds.
 
+Sign-in is **passkey only** (Face ID / fingerprint / security key). The app is a PWA — install from the browser or Settings.
+
 ## Features
 
 ### Personalized plan

@@ -3,6 +3,8 @@ import type { AppStore } from '../hooks/useAppStore'
 import { LOCALES, t } from '../i18n'
 import { themes } from '../themes'
 import { FamilyView } from './FamilyView'
+import { PasskeysCard } from './PasskeysCard'
+import { PwaInstallCard } from './PwaInstallCard'
 
 interface Props {
   store: AppStore
@@ -84,6 +86,9 @@ export function SettingsView({ store, onOpenMember }: Props) {
           </button>
         </div>
       </div>
+
+      <PwaInstallCard store={store} />
+      <PasskeysCard store={store} />
 
       <FamilyView store={store} onOpenMember={onOpenMember} />
     </div>

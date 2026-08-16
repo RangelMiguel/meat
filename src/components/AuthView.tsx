@@ -1,5 +1,5 @@
 import { useState, type FormEvent } from 'react'
-import { LogIn, UserPlus } from 'lucide-react'
+import { KeyRound } from 'lucide-react'
 import type { AppStore } from '../hooks/useAppStore'
 import { LOCALES, t } from '../i18n'
 
@@ -11,7 +11,6 @@ export function AuthView({ store }: Props) {
   const locale = store.locale
   const [mode, setMode] = useState<'login' | 'signup'>('signup')
   const [email, setEmail] = useState('')
-  const [password, setPassword] = useState('')
   const [displayName, setDisplayName] = useState('')
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
@@ -22,8 +21,8 @@ export function AuthView({ store }: Props) {
     setError('')
     const result =
       mode === 'signup'
-        ? await store.signUp({ email, password, displayName })
-        : await store.logIn({ email, password })
+        ? await store.signUp({ email, displayName })
+        : await store.logIn({ email })
     setBusy(false)
     if (result) setError(t(locale, result))
   }
@@ -48,7 +47,13 @@ export function AuthView({ store }: Props) {
           <p className="sub">{t(locale, 'authSub')}</p>
         </div>
       </div>
-      <form className="form-grid" onSubmit={(e) => void handleSubmit(e)}>
+      <form
+        className="form-grid"
+        onSubmit={(e) => void handleSubmit(e)}
+        autoComplete="off"
+        data-1p-ignore
+        data-lpignore="true"
+      >
         {error && (
           <div className="alert alert-danger">
             <strong>{error}</strong>
@@ -67,32 +72,38 @@ export function AuthView({ store }: Props) {
           </div>
         )}
         <div className="field">
-          <label htmlFor="auth-email">{t(locale, 'email')}</label>
+          <label htmlFor="auth-email">
+            {mode === 'signup' ? t(locale, 'email') : t(locale, 'emailOptionalPasskey')}
+          </label>
           <input
             id="auth-email"
             type="email"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
-            autoComplete="email"
-            required
+            autoComplete={mode === 'signup' ? 'email' : 'username webauthn'}
+            required={mode === 'signup'}
           />
+          {mode === 'login' && (
+            <p className="sub" style={{ marginTop: '0.35rem' }}>
+              {t(locale, 'emailOptionalPasskeyHint')}
+            </p>
+          )}
         </div>
-        <div className="field">
-          <label htmlFor="auth-pass">{t(locale, 'password')}</label>
-          <input
-            id="auth-pass"
-            type="password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            autoComplete={mode === 'signup' ? 'new-password' : 'current-password'}
-            minLength={mode === 'signup' ? 6 : undefined}
-            required
-          />
-        </div>
+        {mode === 'signup' && (
+          <p className="sub" style={{ margin: 0 }}>
+            {t(locale, 'registerPasskeyPrompt')}
+          </p>
+        )}
         <div className="btn-row">
           <button className="btn btn-primary" type="submit" disabled={busy}>
-            {mode === 'signup' ? <UserPlus size={16} /> : <LogIn size={16} />}
-            {mode === 'signup' ? t(locale, 'createAccount') : t(locale, 'signIn')}
+            <KeyRound size={16} />
+            {busy
+              ? mode === 'signup'
+                ? t(locale, 'creatingPasskey')
+                : t(locale, 'passkeyWaiting')
+              : mode === 'signup'
+                ? t(locale, 'createWithPasskey')
+                : t(locale, 'passkeyLogin')}
           </button>
           <button
             className="btn btn-ghost"
@@ -105,6 +116,9 @@ export function AuthView({ store }: Props) {
             {mode === 'signup' ? t(locale, 'haveAccount') : t(locale, 'needAccount')}
           </button>
         </div>
+        <p className="sub" style={{ margin: 0 }}>
+          {t(locale, 'passkeyHint')}
+        </p>
       </form>
     </div>
   )

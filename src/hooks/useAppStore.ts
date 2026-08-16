@@ -29,6 +29,12 @@ type AuthError =
   | 'weakPassword'
   | 'emailTaken'
   | 'badLogin'
+  | 'passkeyRequired'
+  | 'passkeyUnsupported'
+  | 'passkeyFailed'
+  | 'passkeyExpired'
+  | 'passkeyUnknown'
+  | 'passkeyLast'
   | 'familyNameRequired'
   | 'badInvite'
   | 'alreadyInFamily'
@@ -43,6 +49,12 @@ const AUTH_CODES = new Set<AuthError>([
   'weakPassword',
   'emailTaken',
   'badLogin',
+  'passkeyRequired',
+  'passkeyUnsupported',
+  'passkeyFailed',
+  'passkeyExpired',
+  'passkeyUnknown',
+  'passkeyLast',
   'familyNameRequired',
   'badInvite',
   'alreadyInFamily',
@@ -201,22 +213,42 @@ export function useAppStore() {
     [mutate, status],
   )
 
+  const registerPasskey = useCallback(async (nickname?: string): Promise<AuthError | null> => {
+    const { startRegistration, browserSupportsWebAuthn } = await import('@simplewebauthn/browser')
+    if (!browserSupportsWebAuthn()) return 'passkeyUnsupported'
+    try {
+      const options = await api<Record<string, unknown>>('/api/auth/webauthn/register', {
+        method: 'POST',
+      })
+      const response = await startRegistration({ optionsJSON: options as never })
+      await api('/api/auth/webauthn/register', {
+        method: 'PUT',
+        body: JSON.stringify({ response, nickname }),
+      })
+      return null
+    } catch (error) {
+      return toAuthError(error)
+    }
+  }, [])
+
   const signUp = useCallback(
-    async (input: {
-      email: string
-      password: string
-      displayName: string
-    }): Promise<AuthError | null> => {
+    async (input: { email: string; displayName: string }): Promise<AuthError | null> => {
       const email = input.email.trim().toLowerCase()
       const displayName = input.displayName.trim()
       if (!email) return 'emailRequired'
       if (!displayName) return 'nameRequired'
-      if (input.password.length < 6) return 'weakPassword'
+      const { browserSupportsWebAuthn } = await import('@simplewebauthn/browser')
+      if (!browserSupportsWebAuthn()) return 'passkeyUnsupported'
       try {
         const next = await api<WorkspaceDTO>('/api/auth/register', {
           method: 'POST',
-          body: JSON.stringify({ email, password: input.password, displayName }),
+          body: JSON.stringify({ email, displayName }),
         })
+        const passkeyError = await registerPasskey(displayName)
+        if (passkeyError) {
+          await api('/api/auth/logout', { method: 'POST' }).catch(() => undefined)
+          return passkeyError
+        }
         const local = loadState()
         if (local.legacy) {
           const imported = await api<WorkspaceDTO>('/api/workspace', {
@@ -232,19 +264,25 @@ export function useAppStore() {
         return toAuthError(error)
       }
     },
-    [applyWorkspace],
+    [applyWorkspace, registerPasskey],
   )
 
   const logIn = useCallback(
-    async (input: { email: string; password: string }): Promise<AuthError | null> => {
-      if (!input.email.trim() || !input.password) return 'badLogin'
+    async (input: { email?: string }): Promise<AuthError | null> => {
+      const { startAuthentication, browserSupportsWebAuthn } = await import(
+        '@simplewebauthn/browser'
+      )
+      if (!browserSupportsWebAuthn()) return 'passkeyUnsupported'
       try {
-        const next = await api<WorkspaceDTO>('/api/auth/login', {
+        const email = input.email?.trim().toLowerCase()
+        const options = await api<Record<string, unknown>>('/api/auth/webauthn/login', {
           method: 'POST',
-          body: JSON.stringify({
-            email: input.email.trim().toLowerCase(),
-            password: input.password,
-          }),
+          body: JSON.stringify(email ? { email } : {}),
+        })
+        const response = await startAuthentication({ optionsJSON: options as never })
+        const next = await api<WorkspaceDTO>('/api/auth/webauthn/login', {
+          method: 'PUT',
+          body: JSON.stringify({ response }),
         })
         applyWorkspace(next)
         return null
@@ -662,6 +700,7 @@ export function useAppStore() {
     setTheme,
     signUp,
     logIn,
+    registerPasskey,
     logOut,
     setActiveMember,
     createFamily,

@@ -19,6 +19,7 @@ import { PurchaseView } from './components/PurchaseView'
 import { RecipesView } from './components/RecipesView'
 import { SettingsView } from './components/SettingsView'
 import { TodayView } from './components/TodayView'
+import { PwaProvider } from './components/PwaProvider'
 import { assertCatalogIntegrity } from './data/catalog'
 import { useAppStore } from './hooks/useAppStore'
 import { t } from './i18n'
@@ -59,6 +60,7 @@ export default function App() {
     store.household.find((member) => member.id === planMemberId) ?? store.myMember ?? null
 
   return (
+    <PwaProvider>
     <div className="app">
       <header className="app-header">
         <div className="container header-inner">
@@ -270,5 +272,6 @@ export default function App() {
         </span>
       </footer>
     </div>
+    </PwaProvider>
   )
 }

@@ -1,5 +1,5 @@
 import { z } from 'zod'
-import { createSessionToken, hashPassword, setSessionCookie } from '@/lib/auth'
+import { createSessionToken, setSessionCookie } from '@/lib/auth'
 import { prisma } from '@/lib/db'
 import { createHouseholdWithOwner } from '@/lib/household'
 import { jsonError, jsonOk } from '@/lib/access'
@@ -8,10 +8,13 @@ import { loadWorkspace } from '@/lib/workspace'
 
 const schema = z.object({
   email: z.string().email(),
-  password: z.string().min(6).max(128),
   displayName: z.string().min(1).max(80),
 })
 
+/**
+ * Create account. Password auth is disabled — client must immediately
+ * register a passkey via /api/auth/webauthn/register.
+ */
 export async function POST(req: Request) {
   const ip = clientIp(req)
   try {
@@ -26,14 +29,28 @@ export async function POST(req: Request) {
     const displayName = body.displayName.trim()
     if (!displayName) return jsonOk({ error: 'nameRequired' }, 400)
 
-    const existing = await prisma.user.findUnique({ where: { email } })
-    if (existing) return jsonOk({ error: 'emailTaken' }, 409)
+    const existing = await prisma.user.findUnique({
+      where: { email },
+      include: { _count: { select: { webauthnCredentials: true } } },
+    })
 
-    const passwordHash = await hashPassword(body.password)
+    if (existing) {
+      const hasPasskey = existing._count.webauthnCredentials > 0
+      if (hasPasskey || existing.passwordHash) return jsonOk({ error: 'emailTaken' }, 409)
+
+      const token = await createSessionToken({
+        userId: existing.id,
+        email: existing.email,
+        displayName: existing.displayName,
+      })
+      await setSessionCookie(token)
+      return jsonOk(await loadWorkspace(existing.id), 200)
+    }
+
     const user = await prisma.user.create({
       data: {
         email,
-        passwordHash,
+        passwordHash: null,
         displayName,
       },
     })
