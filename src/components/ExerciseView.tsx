@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react'
-import { Dumbbell, Trash2 } from 'lucide-react'
+import { Trash2 } from 'lucide-react'
 import type { AppStore } from '../hooks/useAppStore'
 import { exerciseLabel, t } from '../i18n'
 import { formatDateLabel } from '../lib/calories'
