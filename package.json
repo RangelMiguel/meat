@@ -8,6 +8,7 @@
     "build:local": "prisma generate && next build",
     "start": "next start",
     "lint": "oxlint",
+    "audit:catalog": "npx tsx scripts/audit-catalog.mjs",
     "db:generate": "prisma generate",
     "db:migrate": "prisma migrate dev",
     "db:migrate:deploy": "prisma migrate deploy",

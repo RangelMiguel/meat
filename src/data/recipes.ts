@@ -6,6 +6,8 @@ import type { Recipe } from './types'
  * (grams for solids, milliliters for liquids). Liquid amounts were
  * converted from mass using ingredient density. Ingredient macros
  * (per 100 g) live in `ingredients.ts`.
+ * Meat/poultry amounts are raw edible weight (not bone-in rack weight).
+ * Frying oil/lard is the amount typically absorbed, not the pot fill.
  * Recipes without `cuisine` are treated as Mexican.
  */
 export const RECIPES: Recipe[] = [
@@ -69,7 +71,7 @@ export const RECIPES: Recipe[] = [
       { ingredientId: 'tomato', grams: 400, note: 'for salsa' },
       { ingredientId: 'white-onion', grams: 80 },
       { ingredientId: 'garlic', grams: 10 },
-      { ingredientId: 'vegetable-oil', grams: 87, note: 'for frying' },
+      { ingredientId: 'vegetable-oil', grams: 43.5, note: 'oil absorbed when frying' },
       { ingredientId: 'all-purpose-flour', grams: 20, note: 'light dusting before batter' },
       { ingredientId: 'salt', grams: 5 },
       { ingredientId: 'black-pepper', grams: 1 },
@@ -109,7 +111,7 @@ export const RECIPES: Recipe[] = [
     servings: 4,
     summary: 'Corn tortillas filled with chicken, bathed in green tomatillo salsa.',
     ingredients: [
-      { ingredientId: 'chicken-breast', grams: 500, note: 'cooked and shredded' },
+      { ingredientId: 'chicken-breast', grams: 500, note: 'raw weight; cook and shred' },
       { ingredientId: 'corn-tortilla', grams: 280, note: '~12 tortillas' },
       { ingredientId: 'tomatillo', grams: 500 },
       { ingredientId: 'serrano', grams: 30 },
@@ -227,7 +229,7 @@ export const RECIPES: Recipe[] = [
     summary: 'Pork confit-style in its fat until tender and crispy-edged.',
     ingredients: [
       { ingredientId: 'pork-butt', grams: 1500 },
-      { ingredientId: 'lard', grams: 200, note: 'for confit; less if braising' },
+      { ingredientId: 'lard', grams: 50, note: 'fat retained after confit; rest stays in the pot' },
       { ingredientId: 'white-onion', grams: 100 },
       { ingredientId: 'garlic', grams: 25 },
       { ingredientId: 'orange', grams: 120, note: 'juice + peel' },
@@ -273,7 +275,7 @@ export const RECIPES: Recipe[] = [
     servings: 6,
     summary: 'Shredded chicken in tomato-chipotle sauce with onion; for tostadas or tacos.',
     ingredients: [
-      { ingredientId: 'chicken-breast', grams: 700, note: 'cooked and shredded' },
+      { ingredientId: 'chicken-breast', grams: 700, note: 'raw weight; cook and shred' },
       { ingredientId: 'tomato', grams: 500 },
       { ingredientId: 'chipotle', grams: 40, note: 'in adobo' },
       { ingredientId: 'white-onion', grams: 200 },
@@ -448,7 +450,7 @@ export const RECIPES: Recipe[] = [
       { ingredientId: 'chicken-broth', grams: 396, note: 'for masa' },
       { ingredientId: 'baking-powder', grams: 8 },
       { ingredientId: 'salt', grams: 10 },
-      { ingredientId: 'chicken-breast', grams: 500, note: 'shredded filling' },
+      { ingredientId: 'chicken-breast', grams: 500, note: 'raw weight; shredded filling' },
       { ingredientId: 'tomatillo', grams: 300, note: 'salsa verde filling' },
       { ingredientId: 'serrano', grams: 20 },
       { ingredientId: 'garlic', grams: 10 },
@@ -466,7 +468,7 @@ export const RECIPES: Recipe[] = [
     summary: 'Corn tortillas filled with chicken, covered in red chile sauce.',
     ingredients: [
       { ingredientId: 'corn-tortilla', grams: 280, note: '~12 tortillas' },
-      { ingredientId: 'chicken-breast', grams: 400, note: 'shredded' },
+      { ingredientId: 'chicken-breast', grams: 400, note: 'raw weight; shredded' },
       { ingredientId: 'guajillo', grams: 40 },
       { ingredientId: 'ancho', grams: 20 },
       { ingredientId: 'garlic', grams: 12 },
@@ -599,7 +601,7 @@ export const RECIPES: Recipe[] = [
       { ingredientId: 'mayonnaise', grams: 40 },
       { ingredientId: 'lime', grams: 50 },
       { ingredientId: 'corn-tortilla', grams: 240 },
-      { ingredientId: 'vegetable-oil', grams: 108.7, note: 'frying' },
+      { ingredientId: 'vegetable-oil', grams: 43.5, note: 'oil absorbed when frying' },
       { ingredientId: 'salt', grams: 5 },
       { ingredientId: 'black-pepper', grams: 1 },
       { ingredientId: 'chili-powder', grams: 3 },
@@ -661,7 +663,7 @@ export const RECIPES: Recipe[] = [
     ingredients: [
       { ingredientId: 'corn-tortilla', grams: 280 },
       { ingredientId: 'chicken-breast', grams: 400 },
-      { ingredientId: 'vegetable-oil', grams: 108.7 },
+      { ingredientId: 'vegetable-oil', grams: 43.5, note: 'oil absorbed when frying' },
       { ingredientId: 'lettuce', grams: 80 },
       { ingredientId: 'mexican-crema', grams: 60 },
       { ingredientId: 'queso-fresco', grams: 50 },
@@ -1419,7 +1421,7 @@ export const RECIPES: Recipe[] = [
       { ingredientId: 'queso-asadero', grams: 120 },
       { ingredientId: 'white-onion', grams: 50 },
       { ingredientId: 'tomato', grams: 80 },
-      { ingredientId: 'vegetable-oil', grams: 163, note: 'frying' },
+      { ingredientId: 'vegetable-oil', grams: 43.5, note: 'oil absorbed when frying' },
       { ingredientId: 'mexican-crema', grams: 60 },
       { ingredientId: 'salt', grams: 5 },
       { ingredientId: 'cumin', grams: 2 },
@@ -1749,7 +1751,7 @@ export const RECIPES: Recipe[] = [
       { ingredientId: 'beef-milanesa', grams: 500 },
       { ingredientId: 'egg', grams: 100 },
       { ingredientId: 'breadcrumbs', grams: 100 },
-      { ingredientId: 'vegetable-oil', grams: 108.7 },
+      { ingredientId: 'vegetable-oil', grams: 54.3, note: 'oil absorbed when frying cutlets' },
       { ingredientId: 'refried-beans', grams: 150 },
       { ingredientId: 'avocado', grams: 120 },
       { ingredientId: 'tomato', grams: 80 },
@@ -1797,7 +1799,7 @@ export const RECIPES: Recipe[] = [
       { ingredientId: 'queso-oaxaca', grams: 120 },
       { ingredientId: 'white-onion', grams: 40 },
       { ingredientId: 'chipotle', grams: 20 },
-      { ingredientId: 'vegetable-oil', grams: 87 },
+      { ingredientId: 'vegetable-oil', grams: 43.5, note: 'oil absorbed when frying cutlets' },
       { ingredientId: 'sesame-seeds', grams: 10, note: 'on bread' },
       { ingredientId: 'lettuce', grams: 40 },
       { ingredientId: 'salt', grams: 4 },
@@ -1840,7 +1842,7 @@ export const RECIPES: Recipe[] = [
       { ingredientId: 'red-onion', grams: 100 },
       { ingredientId: 'cabbage', grams: 100 },
       { ingredientId: 'tomato', grams: 60 },
-      { ingredientId: 'vegetable-oil', grams: 87 },
+      { ingredientId: 'vegetable-oil', grams: 54.3, note: 'oil absorbed when frying masa' },
       { ingredientId: 'salt', grams: 5 },
       { ingredientId: 'lime', grams: 30 },
       { ingredientId: 'habanero', grams: 8 },
@@ -1908,7 +1910,7 @@ export const RECIPES: Recipe[] = [
       { ingredientId: 'white-onion', grams: 50 },
       { ingredientId: 'jalapeno', grams: 15 },
       { ingredientId: 'mayonnaise', grams: 40 },
-      { ingredientId: 'vegetable-oil', grams: 108.7, note: 'frying' },
+      { ingredientId: 'vegetable-oil', grams: 43.5, note: 'oil absorbed when frying' },
       { ingredientId: 'salt', grams: 5 },
     ],
   },
@@ -2241,7 +2243,7 @@ export const RECIPES: Recipe[] = [
     servings: 4,
     summary: 'Slow-cooked pork ribs glazed with barbecue sauce.',
     ingredients: [
-      { ingredientId: 'pork-ribs', grams: 1200 },
+      { ingredientId: 'pork-ribs', grams: 900, note: 'edible meat+fat, not bone-in rack weight' },
       { ingredientId: 'bbq-sauce', grams: 219.3 },
       { ingredientId: 'brown-sugar', grams: 40 },
       { ingredientId: 'paprika', grams: 8 },
@@ -2261,7 +2263,7 @@ export const RECIPES: Recipe[] = [
     servings: 4,
     summary: 'Crispy chicken wings tossed in hot sauce and butter, with celery and blue cheese.',
     ingredients: [
-      { ingredientId: 'chicken-wing', grams: 1000 },
+      { ingredientId: 'chicken-wing', grams: 800, note: 'meat and skin, not bone-in purchase weight' },
       { ingredientId: 'hot-sauce', grams: 77.7 },
       { ingredientId: 'butter', grams: 60 },
       { ingredientId: 'celery', grams: 150 },

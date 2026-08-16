@@ -120,6 +120,22 @@ export const INGREDIENTS: Ingredient[] = [
     per100g: { kcal: 360, protein: 6.6, carbs: 79.0, fat: 0.6 },
   },
   {
+    id: 'brown-rice',
+    name: 'Brown rice',
+    nameEs: 'Arroz integral',
+    category: 'grain',
+    form: 'raw',
+    per100g: { kcal: 370, protein: 7.5, carbs: 77.2, fat: 2.7 },
+  },
+  {
+    id: 'oats',
+    name: 'Rolled oats',
+    nameEs: 'Avena',
+    category: 'grain',
+    form: 'dry',
+    per100g: { kcal: 389, protein: 16.9, carbs: 66.3, fat: 6.9 },
+  },
+  {
     id: 'hominy',
     name: 'Hominy / maíz pozolero',
     nameEs: 'Maíz pozolero (hominy)',
@@ -1106,6 +1122,14 @@ export const INGREDIENTS: Ingredient[] = [
     category: 'fruit',
     form: 'raw',
     per100g: { kcal: 52, protein: 0.3, carbs: 14.0, fat: 0.2 },
+  },
+  {
+    id: 'banana',
+    name: 'Banana',
+    nameEs: 'Plátano',
+    category: 'fruit',
+    form: 'raw',
+    per100g: { kcal: 89, protein: 1.1, carbs: 22.8, fat: 0.3 },
   },
   {
     id: 'peach',
