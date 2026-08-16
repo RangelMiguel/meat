@@ -4,11 +4,17 @@ Codename **meat** — a personal calorie tracker with a customized daily plan.
 
 ## Run
 
+PostgreSQL + `AUTH_SECRET` (same setup as misfinanzas-family). Copy `.env.example` to `.env` and point `DATABASE_URL` / `DIRECT_URL` at a dedicated database — do not reuse the misfinanzas schema.
+
 ```bash
 cd meat
+cp .env.example .env
 npm install
+npx prisma migrate deploy
 npm run dev
 ```
+
+On Vercel set `DATABASE_URL`, `DIRECT_URL`, and `AUTH_SECRET` (min 16 chars) for Production and Builds.
 
 ## Features
 
@@ -34,4 +40,4 @@ Grove · Ignite · Citrus · Slate · Berry (switch anytime in the header)
 
 ## Data
 
-Everything is stored in `localStorage` under `meat-app-v1` (plan, food log, water, theme). No backend yet.
+Accounts and household data live in PostgreSQL (Prisma). Sessions are httpOnly JWT cookies (`meat_session`), matching misfinanzas-family. Theme/locale still cache in `localStorage`.

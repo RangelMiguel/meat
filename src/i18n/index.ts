@@ -374,6 +374,8 @@ const en = {
   weakPassword: 'Use at least 6 characters for the password.',
   emailTaken: 'That email already has an account. Log in instead.',
   badLogin: 'Email or password is wrong.',
+  networkError: 'Could not reach the server. Try again.',
+  loadingSession: 'Loading your kitchen…',
   signedInAs: 'Signed in as {name}',
 
   family: 'Family',
@@ -847,6 +849,8 @@ const es: Record<keyof typeof en, string> = {
   weakPassword: 'Usa al menos 6 caracteres en la contraseña.',
   emailTaken: 'Ese correo ya tiene cuenta. Entra en su lugar.',
   badLogin: 'El correo o la contraseña no coinciden.',
+  networkError: 'No se pudo conectar al servidor. Inténtalo de nuevo.',
+  loadingSession: 'Cargando tu cocina…',
   signedInAs: 'Sesión de {name}',
 
   family: 'Familia',

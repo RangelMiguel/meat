@@ -1,50 +1,188 @@
-const CODE_ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'
+import { SignJWT, jwtVerify } from 'jose'
+import { cookies } from 'next/headers'
+import { prisma } from './db'
+import bcrypt from 'bcryptjs'
+import { randomBytes } from 'crypto'
 
-function toHex(buffer: ArrayBuffer): string {
-  return [...new Uint8Array(buffer)].map((b) => b.toString(16).padStart(2, '0')).join('')
-}
+const COOKIE = 'meat_session'
+const MAX_AGE = 60 * 60 * 24 * 14 // 14 days
 
-export function normalizeEmail(email: string): string {
-  return email.trim().toLowerCase()
-}
-
-export function randomSalt(): string {
-  const bytes = new Uint8Array(16)
-  crypto.getRandomValues(bytes)
-  return toHex(bytes.buffer)
-}
-
-export async function hashPassword(password: string, salt: string): Promise<string> {
-  const data = new TextEncoder().encode(`${salt}:${password}`)
-  const digest = await crypto.subtle.digest('SHA-256', data)
-  return toHex(digest)
-}
-
-export async function verifyPassword(
-  password: string,
-  salt: string,
-  expectedHash: string,
-): Promise<boolean> {
-  const actual = await hashPassword(password, salt)
-  if (actual.length !== expectedHash.length) return false
-  let mismatch = 0
-  for (let i = 0; i < actual.length; i += 1) {
-    mismatch |= actual.charCodeAt(i) ^ expectedHash.charCodeAt(i)
+function secret() {
+  const s = process.env.AUTH_SECRET
+  if (!s || s.length < 16) {
+    throw new Error('AUTH_SECRET must be set (min 16 chars)')
   }
-  return mismatch === 0
+  return new TextEncoder().encode(s)
 }
 
-export function makeInviteCode(existing: Set<string>): string {
-  for (let attempt = 0; attempt < 40; attempt += 1) {
-    let code = ''
-    const bytes = new Uint8Array(6)
-    crypto.getRandomValues(bytes)
-    for (const byte of bytes) code += CODE_ALPHABET[byte % CODE_ALPHABET.length]
-    if (!existing.has(code)) return code
+export type SessionPayload = {
+  userId: string
+  email: string
+  displayName: string
+}
+
+export async function hashPassword(password: string) {
+  return bcrypt.hash(password, 12)
+}
+
+export async function verifyPassword(password: string, hash: string | null | undefined) {
+  if (!hash) return false
+  return bcrypt.compare(password, hash)
+}
+
+export async function createSessionToken(payload: SessionPayload) {
+  return new SignJWT({ ...payload })
+    .setProtectedHeader({ alg: 'HS256' })
+    .setIssuedAt()
+    .setExpirationTime(`${MAX_AGE}s`)
+    .sign(secret())
+}
+
+export async function verifySessionToken(token: string): Promise<SessionPayload | null> {
+  try {
+    const { payload } = await jwtVerify(token, secret())
+    if (
+      typeof payload.userId === 'string' &&
+      typeof payload.email === 'string' &&
+      typeof payload.displayName === 'string'
+    ) {
+      return {
+        userId: payload.userId,
+        email: payload.email,
+        displayName: payload.displayName,
+      }
+    }
+    return null
+  } catch {
+    return null
   }
-  return `F${Date.now().toString(36).toUpperCase().slice(-5)}`
 }
 
-export function normalizeInviteCode(code: string): string {
-  return code.trim().toUpperCase().replace(/[^A-Z0-9]/g, '')
+export async function setSessionCookie(token: string) {
+  const jar = await cookies()
+  jar.set(COOKIE, token, {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === 'production',
+    sameSite: 'lax',
+    path: '/',
+    maxAge: MAX_AGE,
+  })
 }
+
+export async function clearSessionCookie() {
+  const jar = await cookies()
+  jar.delete(COOKIE)
+}
+
+export async function getSession(): Promise<SessionPayload | null> {
+  const jar = await cookies()
+  const token = jar.get(COOKIE)?.value
+  if (!token) return null
+  return verifySessionToken(token)
+}
+
+export async function requireSession(): Promise<SessionPayload> {
+  const s = await getSession()
+  if (!s) throw new AuthError('No autenticado')
+  return s
+}
+
+export class AuthError extends Error {
+  status = 401
+  constructor(message: string) {
+    super(message)
+    this.name = 'AuthError'
+  }
+}
+
+export class ForbiddenError extends Error {
+  status = 403
+  constructor(message: string) {
+    super(message)
+    this.name = 'ForbiddenError'
+  }
+}
+
+export class BadRequestError extends Error {
+  status = 400
+  constructor(message: string) {
+    super(message)
+    this.name = 'BadRequestError'
+  }
+}
+
+export class RateLimitError extends Error {
+  status = 429
+  constructor(message: string) {
+    super(message)
+    this.name = 'RateLimitError'
+  }
+}
+
+export type Role = 'owner' | 'admin' | 'member' | 'viewer'
+
+const ROLE_RANK: Record<Role, number> = {
+  viewer: 1,
+  member: 2,
+  admin: 3,
+  owner: 4,
+}
+
+export function canWrite(role: string) {
+  return ROLE_RANK[role as Role] >= ROLE_RANK.member
+}
+
+export function canAdmin(role: string) {
+  return ROLE_RANK[role as Role] >= ROLE_RANK.admin
+}
+
+/** Resolve active household membership for user (preference, else first). */
+export async function getActiveMembership(userId: string, householdId?: string) {
+  if (householdId) {
+    return prisma.membership.findUnique({
+      where: { householdId_userId: { householdId, userId } },
+      include: { household: true },
+    })
+  }
+  const pref = await prisma.userPreference.findUnique({
+    where: { userId },
+    select: { householdId: true },
+  })
+  if (pref?.householdId) {
+    const preferred = await prisma.membership.findUnique({
+      where: {
+        householdId_userId: { householdId: pref.householdId, userId },
+      },
+      include: { household: true },
+    })
+    if (preferred) return preferred
+  }
+  return prisma.membership.findFirst({
+    where: { userId },
+    include: { household: true },
+    orderBy: { createdAt: 'asc' },
+  })
+}
+
+export type HouseholdAccess = NonNullable<Awaited<ReturnType<typeof getActiveMembership>>>
+
+export async function requireHouseholdAccess(
+  userId: string,
+  opts?: { write?: boolean; admin?: boolean; householdId?: string },
+): Promise<HouseholdAccess> {
+  const m = await getActiveMembership(userId, opts?.householdId)
+  if (!m) throw new ForbiddenError('No perteneces a un hogar')
+  if (opts?.write && !canWrite(m.role)) {
+    throw new ForbiddenError('Solo lectura: no puedes modificar datos')
+  }
+  if (opts?.admin && !canAdmin(m.role)) {
+    throw new ForbiddenError('Se requieren permisos de administrador')
+  }
+  return m
+}
+
+export function generateInviteToken() {
+  return randomBytes(32).toString('hex')
+}
+
+export { COOKIE as SESSION_COOKIE }

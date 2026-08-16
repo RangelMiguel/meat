@@ -154,21 +154,23 @@ export function TodayView({
   }
 
   const handleRecipeLog = (payload: RecipeLogPayload) => {
-    const ok = store.logRecipeWithInventory({
-      meal: payload.meal,
-      name: payload.name,
-      detail: payload.detail,
-      recipeId: payload.recipeId,
-      portions: payload.portions,
-    })
-    if (!ok) return
-    setLogMode('closed')
-    onStartCooking({
-      recipeId: payload.recipeId,
-      servings: payload.portions.reduce((sum, part) => sum + part.servings, 0),
-      meal: payload.meal,
-      eaterNames: payload.portions.map((part) => part.name),
-    })
+    void (async () => {
+      const ok = await store.logRecipeWithInventory({
+        meal: payload.meal,
+        name: payload.name,
+        detail: payload.detail,
+        recipeId: payload.recipeId,
+        portions: payload.portions,
+      })
+      if (!ok) return
+      setLogMode('closed')
+      onStartCooking({
+        recipeId: payload.recipeId,
+        servings: payload.portions.reduce((sum, part) => sum + part.servings, 0),
+        meal: payload.meal,
+        eaterNames: payload.portions.map((part) => part.name),
+      })
+    })()
   }
 
   const handleCustomLog = (payload: LogFoodPayload) => {

@@ -1,15 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import type { Recipe } from '../data/types'
-import { clampBoughtOn, clampGrams, todayKey, uid } from '../lib/calories'
-import {
-  hashPassword,
-  makeInviteCode,
-  normalizeEmail,
-  normalizeInviteCode,
-  randomSalt,
-  verifyPassword,
-} from '../lib/auth'
-import { consumeInventoryLots, recipeNeedsForServings } from '../lib/portions'
+import { todayKey, uid } from '../lib/calories'
+import { api, ApiError } from '../lib/api'
 import {
   findMergedRecipe,
   isUserRecipe,
@@ -18,13 +10,12 @@ import {
 } from '../lib/recipeLibrary'
 import { loadState, saveState } from '../lib/storage'
 import type { Locale } from '../i18n'
-import type { ThemeId } from '../themes'
+import { defaultTheme, type ThemeId } from '../themes'
+import type { WorkspaceDTO } from '../lib/workspace-types'
 import type {
   Account,
-  AppState,
   CaloriePlan,
   ExerciseEntry,
-  Family,
   FoodEntry,
   InventoryItem,
   Kitchen,
@@ -44,110 +35,40 @@ type AuthError =
   | 'notInFamily'
   | 'ownerMustDissolve'
   | 'cannotRemoveSelf'
+  | 'networkError'
 
-function emptyKitchen(partial: Pick<Kitchen, 'id' | 'familyId' | 'ownerAccountId'>): Kitchen {
-  return {
-    ...partial,
-    inventory: [],
-    purchaseList: [],
-    customRecipes: [],
-    recipeOverrides: {},
-  }
+const AUTH_CODES = new Set<AuthError>([
+  'emailRequired',
+  'nameRequired',
+  'weakPassword',
+  'emailTaken',
+  'badLogin',
+  'familyNameRequired',
+  'badInvite',
+  'alreadyInFamily',
+  'notInFamily',
+  'ownerMustDissolve',
+  'cannotRemoveSelf',
+  'networkError',
+])
+
+function toAuthError(error: unknown): AuthError {
+  const code = error instanceof ApiError ? error.code : error instanceof Error ? error.message : ''
+  return AUTH_CODES.has(code as AuthError) ? (code as AuthError) : 'networkError'
 }
 
-function emptyMember(
-  partial: Pick<Member, 'id' | 'accountId' | 'familyId' | 'kitchenId' | 'name'>,
-): Member {
-  return {
-    ...partial,
-    plan: null,
-    entries: [],
-    exercises: [],
-    water: {},
-  }
+function memberForAccount(members: Member[], accountId: string): Member | undefined {
+  return members.find((member) => member.accountId === accountId)
 }
 
-function memberForAccount(state: AppState, accountId: string): Member | undefined {
-  return state.members.find((member) => member.accountId === accountId)
-}
-
-function activeMemberOf(state: AppState): Member | undefined {
-  return state.members.find((member) => member.id === state.activeMemberId)
-}
-
-function kitchenOf(state: AppState, kitchenId: string | undefined): Kitchen | undefined {
+function kitchenOf(kitchens: Kitchen[], kitchenId: string | undefined): Kitchen | undefined {
   if (!kitchenId) return undefined
-  return state.kitchens.find((kitchen) => kitchen.id === kitchenId)
+  return kitchens.find((kitchen) => kitchen.id === kitchenId)
 }
 
-function familyMembersOf(state: AppState, familyId: string | null): Member[] {
-  if (!familyId) {
-    const member = activeMemberOf(state)
-    return member ? [member] : []
-  }
-  return state.members.filter((member) => member.familyId === familyId)
-}
-
-function canViewMember(state: AppState, memberId: string): boolean {
-  const accountId = state.sessionAccountId
-  if (!accountId) return false
-  const mine = memberForAccount(state, accountId)
-  const target = state.members.find((member) => member.id === memberId)
-  if (!mine || !target) return false
-  if (target.id === mine.id) return true
-  return Boolean(mine.familyId && mine.familyId === target.familyId)
-}
-
-function patchMember(
-  state: AppState,
-  memberId: string,
-  patch: (member: Member) => Member,
-): AppState {
-  return {
-    ...state,
-    members: state.members.map((member) => (member.id === memberId ? patch(member) : member)),
-  }
-}
-
-function patchKitchen(
-  state: AppState,
-  kitchenId: string,
-  patch: (kitchen: Kitchen) => Kitchen,
-): AppState {
-  return {
-    ...state,
-    kitchens: state.kitchens.map((kitchen) =>
-      kitchen.id === kitchenId ? patch(kitchen) : kitchen,
-    ),
-  }
-}
-
-function mergeKitchens(into: Kitchen, from: Kitchen): Kitchen {
-  const inventory = [...into.inventory]
-  for (const lot of from.inventory) {
-    const idx = inventory.findIndex(
-      (item) => item.ingredientId === lot.ingredientId && item.boughtOn === lot.boughtOn,
-    )
-    if (idx === -1) inventory.push(lot)
-    else inventory[idx] = { ...inventory[idx], grams: clampGrams(inventory[idx].grams + lot.grams) }
-  }
-  const purchaseList = [...into.purchaseList]
-  for (const item of from.purchaseList) {
-    const idx = purchaseList.findIndex((row) => row.ingredientId === item.ingredientId)
-    if (idx === -1) purchaseList.push(item)
-    else purchaseList[idx] = { ...purchaseList[idx], grams: clampGrams(purchaseList[idx].grams + item.grams) }
-  }
-  const customIds = new Set(into.customRecipes.map((recipe) => recipe.id))
-  return {
-    ...into,
-    inventory,
-    purchaseList,
-    customRecipes: [
-      ...into.customRecipes,
-      ...from.customRecipes.filter((recipe) => !customIds.has(recipe.id)),
-    ],
-    recipeOverrides: { ...from.recipeOverrides, ...into.recipeOverrides },
-  }
+function familyMembersOf(members: Member[], familyId: string | null, fallback?: Member): Member[] {
+  if (!familyId) return fallback ? [fallback] : []
+  return members.filter((member) => member.familyId === familyId)
 }
 
 function dayTotals(entries: FoodEntry[], date: string) {
@@ -165,71 +86,120 @@ function dayTotals(entries: FoodEntry[], date: string) {
 }
 
 export function useAppStore() {
-  const [state, setState] = useState(() => loadState())
-  const [hydrated, setHydrated] = useState(false)
+  const [status, setStatus] = useState<'loading' | 'anon' | 'ready'>('loading')
+  const [workspace, setWorkspace] = useState<WorkspaceDTO | null>(null)
+  const [theme, setThemeState] = useState<ThemeId>(defaultTheme)
+  const [locale, setLocaleState] = useState<Locale>('en')
 
-  useEffect(() => {
-    setHydrated(true)
+  const applyWorkspace = useCallback((next: WorkspaceDTO) => {
+    setWorkspace(next)
+    setThemeState(next.theme)
+    setLocaleState(next.locale)
+    setStatus('ready')
   }, [])
 
-  useEffect(() => {
-    if (!hydrated) return
-    saveState(state)
-    document.documentElement.setAttribute('data-theme', state.theme)
-    document.documentElement.lang = state.locale ?? 'en'
-  }, [state, hydrated])
+  const mutate = useCallback(
+    async (body: Record<string, unknown>) => {
+      const next = await api<WorkspaceDTO>('/api/workspace', {
+        method: 'POST',
+        body: JSON.stringify(body),
+      })
+      applyWorkspace(next)
+      return next
+    },
+    [applyWorkspace],
+  )
 
   useEffect(() => {
-    document.documentElement.setAttribute('data-theme', state.theme)
-  }, [state.theme])
+    let cancelled = false
+    const local = loadState()
+    setThemeState(local.theme)
+    setLocaleState(local.locale)
+
+    void (async () => {
+      try {
+        const next = await api<WorkspaceDTO>('/api/workspace')
+        if (cancelled) return
+        applyWorkspace(next)
+        const mine = memberForAccount(next.members, next.account.id)
+        const kit = kitchenOf(next.kitchens, mine?.kitchenId)
+        const empty =
+          !mine?.plan &&
+          (mine?.entries.length ?? 0) === 0 &&
+          (kit?.inventory.length ?? 0) === 0 &&
+          (kit?.customRecipes.length ?? 0) === 0
+        const legacy = local.legacy
+        if (empty && legacy) {
+          const imported = await api<WorkspaceDTO>('/api/workspace', {
+            method: 'POST',
+            body: JSON.stringify({ action: 'importLegacy', ...legacy }),
+          })
+          if (!cancelled) applyWorkspace(imported)
+        }
+      } catch (error) {
+        if (cancelled) return
+        if (error instanceof ApiError && error.status === 401) {
+          setStatus('anon')
+          setWorkspace(null)
+          return
+        }
+        setStatus('anon')
+        setWorkspace(null)
+      }
+    })()
+
+    return () => {
+      cancelled = true
+    }
+  }, [applyWorkspace])
 
   useEffect(() => {
-    const locale = state.locale ?? 'en'
+    if (status === 'loading') return
+    saveState({
+      accounts: [],
+      sessionAccountId: null,
+      activeMemberId: workspace?.activeMemberId ?? null,
+      families: workspace?.family ? [workspace.family] : [],
+      members: workspace?.members ?? [],
+      kitchens: workspace?.kitchens ?? [],
+      legacy: null,
+      theme,
+      locale,
+    })
+    document.documentElement.setAttribute('data-theme', theme)
     document.documentElement.lang = locale
     document.title = locale === 'es' ? 'meat · control de calorías' : 'meat · calorie tracker'
-  }, [state.locale])
+  }, [status, workspace, theme, locale])
 
-  useEffect(() => {
-    if (!state.sessionAccountId) return
-    const mine = memberForAccount(state, state.sessionAccountId)
-    if (!mine) return
-    if (state.activeMemberId && canViewMember(state, state.activeMemberId)) return
-    setState((s) => ({ ...s, activeMemberId: mine.id }))
-  }, [state])
-
-  const account = useMemo(
-    () => state.accounts.find((item) => item.id === state.sessionAccountId) ?? null,
-    [state.accounts, state.sessionAccountId],
-  )
-  const myMember = useMemo(
-    () => (account ? memberForAccount(state, account.id) ?? null : null),
-    [account, state],
-  )
-  const activeMember = useMemo(() => activeMemberOf(state) ?? myMember, [state, myMember])
-  const kitchen = useMemo(
-    () => kitchenOf(state, activeMember?.kitchenId) ?? null,
-    [state, activeMember],
-  )
-  const family = useMemo(
-    () =>
-      activeMember?.familyId
-        ? (state.families.find((item) => item.id === activeMember.familyId) ?? null)
-        : null,
-    [state.families, activeMember],
-  )
+  const account: Account | null = workspace?.account ?? null
+  const members = workspace?.members ?? []
+  const kitchens = workspace?.kitchens ?? []
+  const family = workspace?.family ?? null
+  const myMember = account ? memberForAccount(members, account.id) ?? null : null
+  const activeMember =
+    members.find((member) => member.id === workspace?.activeMemberId) ?? myMember
+  const kitchen = kitchenOf(kitchens, activeMember?.kitchenId) ?? null
   const household = useMemo(
-    () => familyMembersOf(state, activeMember?.familyId ?? null),
-    [state, activeMember],
+    () => familyMembersOf(members, activeMember?.familyId ?? null, activeMember ?? undefined),
+    [members, activeMember],
   )
   const isOwner = Boolean(account && family && family.ownerAccountId === account.id)
 
-  const setTheme = useCallback((theme: ThemeId) => {
-    setState((s) => ({ ...s, theme }))
-  }, [])
+  const setTheme = useCallback(
+    (next: ThemeId) => {
+      setThemeState(next)
+      if (status === 'ready') void mutate({ action: 'setTheme', theme: next })
+    },
+    [mutate, status],
+  )
 
-  const setLocale = useCallback((locale: Locale) => {
-    setState((s) => ({ ...s, locale }))
-  }, [])
+  const setLocale = useCallback(
+    (next: Locale) => {
+      setLocaleState(next)
+      if (status === 'ready') void mutate({ action: 'setLocale', locale: next })
+    },
+    [mutate, status],
+  )
 
   const signUp = useCallback(
     async (input: {
@@ -237,455 +207,163 @@ export function useAppStore() {
       password: string
       displayName: string
     }): Promise<AuthError | null> => {
-      const email = normalizeEmail(input.email)
+      const email = input.email.trim().toLowerCase()
       const displayName = input.displayName.trim()
       if (!email) return 'emailRequired'
       if (!displayName) return 'nameRequired'
       if (input.password.length < 6) return 'weakPassword'
-
-      const salt = randomSalt()
-      const passwordHash = await hashPassword(input.password, salt)
-      let error: AuthError | null = null
-      setState((s) => {
-        if (s.accounts.some((item) => item.email === email)) {
-          error = 'emailTaken'
-          return s
-        }
-        const now = new Date().toISOString()
-        const accountId = uid()
-        const memberId = uid()
-        const kitchenId = uid()
-        const newAccount: Account = {
-          id: accountId,
-          email,
-          displayName,
-          passwordHash,
-          passwordSalt: salt,
-          createdAt: now,
-        }
-        const kitchen = emptyKitchen({
-          id: kitchenId,
-          familyId: null,
-          ownerAccountId: accountId,
+      try {
+        const next = await api<WorkspaceDTO>('/api/auth/register', {
+          method: 'POST',
+          body: JSON.stringify({ email, password: input.password, displayName }),
         })
-        const member = emptyMember({
-          id: memberId,
-          accountId,
-          familyId: null,
-          kitchenId,
-          name: displayName,
-        })
-        if (s.legacy) {
-          member.plan = s.legacy.plan
-          member.entries = s.legacy.entries
-          member.water = s.legacy.water
-          kitchen.inventory = s.legacy.inventory
-          kitchen.purchaseList = s.legacy.purchaseList
-          kitchen.customRecipes = s.legacy.customRecipes
-          kitchen.recipeOverrides = s.legacy.recipeOverrides
+        const local = loadState()
+        if (local.legacy) {
+          const imported = await api<WorkspaceDTO>('/api/workspace', {
+            method: 'POST',
+            body: JSON.stringify({ action: 'importLegacy', ...local.legacy }),
+          })
+          applyWorkspace(imported)
+        } else {
+          applyWorkspace(next)
         }
-        return {
-          ...s,
-          accounts: [...s.accounts, newAccount],
-          members: [...s.members, member],
-          kitchens: [...s.kitchens, kitchen],
-          sessionAccountId: accountId,
-          activeMemberId: memberId,
-          legacy: null,
-        }
-      })
-      return error
+        return null
+      } catch (error) {
+        return toAuthError(error)
+      }
     },
-    [],
+    [applyWorkspace],
   )
 
   const logIn = useCallback(
     async (input: { email: string; password: string }): Promise<AuthError | null> => {
-      const email = normalizeEmail(input.email)
-      if (!email || !input.password) return 'badLogin'
-      const found = state.accounts.find((item) => item.email === email)
-      if (!found) return 'badLogin'
-      const ok = await verifyPassword(input.password, found.passwordSalt, found.passwordHash)
-      if (!ok) return 'badLogin'
-      setState((s) => {
-        const member = memberForAccount(s, found.id)
-        return {
-          ...s,
-          sessionAccountId: found.id,
-          activeMemberId: member?.id ?? s.activeMemberId,
-        }
-      })
-      return null
+      if (!input.email.trim() || !input.password) return 'badLogin'
+      try {
+        const next = await api<WorkspaceDTO>('/api/auth/login', {
+          method: 'POST',
+          body: JSON.stringify({
+            email: input.email.trim().toLowerCase(),
+            password: input.password,
+          }),
+        })
+        applyWorkspace(next)
+        return null
+      } catch (error) {
+        return toAuthError(error)
+      }
     },
-    [state.accounts],
+    [applyWorkspace],
   )
 
   const logOut = useCallback(() => {
-    setState((s) => ({ ...s, sessionAccountId: null, activeMemberId: null }))
+    void api('/api/auth/logout', { method: 'POST' }).catch(() => undefined)
+    setWorkspace(null)
+    setStatus('anon')
   }, [])
 
-  const setActiveMember = useCallback((memberId: string) => {
-    setState((s) => (canViewMember(s, memberId) ? { ...s, activeMemberId: memberId } : s))
-  }, [])
+  const setActiveMember = useCallback(
+    (memberId: string) => {
+      void mutate({ action: 'setActiveMember', memberId })
+    },
+    [mutate],
+  )
 
-  const createFamily = useCallback((name: string): AuthError | null => {
-    const trimmed = name.trim()
-    if (!trimmed) return 'familyNameRequired'
-    let error: AuthError | null = null
-    setState((s) => {
-      if (!s.sessionAccountId) {
-        error = 'badLogin'
-        return s
+  const createFamily = useCallback(
+    async (name: string): Promise<AuthError | null> => {
+      try {
+        await mutate({ action: 'createFamily', name })
+        return null
+      } catch (error) {
+        return toAuthError(error)
       }
-      const mine = memberForAccount(s, s.sessionAccountId)
-      if (!mine) {
-        error = 'badLogin'
-        return s
-      }
-      if (mine.familyId) {
-        error = 'alreadyInFamily'
-        return s
-      }
-      const familyId = uid()
-      const inviteCode = makeInviteCode(new Set(s.families.map((item) => item.inviteCode)))
-      const family: Family = {
-        id: familyId,
-        name: trimmed,
-        inviteCode,
-        ownerAccountId: s.sessionAccountId,
-        createdAt: new Date().toISOString(),
-      }
-      return {
-        ...s,
-        families: [...s.families, family],
-        members: s.members.map((member) =>
-          member.id === mine.id ? { ...member, familyId } : member,
-        ),
-        kitchens: s.kitchens.map((item) =>
-          item.id === mine.kitchenId
-            ? { ...item, familyId, ownerAccountId: s.sessionAccountId }
-            : item,
-        ),
-      }
-    })
-    return error
-  }, [])
+    },
+    [mutate],
+  )
 
-  const joinFamily = useCallback((code: string): AuthError | null => {
-    const invite = normalizeInviteCode(code)
-    if (!invite) return 'badInvite'
-    let error: AuthError | null = null
-    setState((s) => {
-      if (!s.sessionAccountId) {
-        error = 'badLogin'
-        return s
+  const joinFamily = useCallback(
+    async (code: string): Promise<AuthError | null> => {
+      try {
+        await mutate({ action: 'joinFamily', code })
+        return null
+      } catch (error) {
+        return toAuthError(error)
       }
-      const mine = memberForAccount(s, s.sessionAccountId)
-      if (!mine) {
-        error = 'badLogin'
-        return s
-      }
-      if (mine.familyId) {
-        error = 'alreadyInFamily'
-        return s
-      }
-      const family = s.families.find((item) => item.inviteCode === invite)
-      if (!family) {
-        error = 'badInvite'
-        return s
-      }
-      const host = s.members.find((member) => member.familyId === family.id)
-      const hostKitchen = host ? kitchenOf(s, host.kitchenId) : undefined
-      if (!host || !hostKitchen) {
-        error = 'badInvite'
-        return s
-      }
-      const myKitchen = kitchenOf(s, mine.kitchenId)
-      const merged = myKitchen ? mergeKitchens(hostKitchen, myKitchen) : hostKitchen
-      return {
-        ...s,
-        members: s.members.map((member) =>
-          member.id === mine.id
-            ? { ...member, familyId: family.id, kitchenId: hostKitchen.id }
-            : member,
-        ),
-        kitchens: s.kitchens
-          .filter((item) => item.id !== mine.kitchenId)
-          .map((item) => (item.id === hostKitchen.id ? merged : item)),
-        activeMemberId: mine.id,
-      }
-    })
-    return error
-  }, [])
+    },
+    [mutate],
+  )
 
-  const leaveFamily = useCallback((): AuthError | null => {
-    let error: AuthError | null = null
-    setState((s) => {
-      if (!s.sessionAccountId) {
-        error = 'badLogin'
-        return s
-      }
-      const mine = memberForAccount(s, s.sessionAccountId)
-      if (!mine?.familyId) {
-        error = 'notInFamily'
-        return s
-      }
-      const fam = s.families.find((item) => item.id === mine.familyId)
-      if (!fam) {
-        error = 'notInFamily'
-        return s
-      }
-      const others = s.members.filter(
-        (member) => member.familyId === fam.id && member.id !== mine.id,
-      )
-      if (fam.ownerAccountId === s.sessionAccountId && others.length > 0) {
-        error = 'ownerMustDissolve'
-        return s
-      }
-      if (others.length === 0) {
-        return {
-          ...s,
-          families: s.families.filter((item) => item.id !== fam.id),
-          members: s.members.map((member) =>
-            member.id === mine.id ? { ...member, familyId: null } : member,
-          ),
-          kitchens: s.kitchens.map((item) =>
-            item.id === mine.kitchenId
-              ? { ...item, familyId: null, ownerAccountId: s.sessionAccountId }
-              : item,
-          ),
-          activeMemberId: mine.id,
-        }
-      }
-      const kitchenId = uid()
-      return {
-        ...s,
-        members: s.members.map((member) =>
-          member.id === mine.id ? { ...member, familyId: null, kitchenId } : member,
-        ),
-        kitchens: [
-          ...s.kitchens,
-          emptyKitchen({
-            id: kitchenId,
-            familyId: null,
-            ownerAccountId: s.sessionAccountId,
-          }),
-        ],
-        activeMemberId: mine.id,
-      }
-    })
-    return error
-  }, [])
+  const leaveFamily = useCallback(async (): Promise<AuthError | null> => {
+    try {
+      await mutate({ action: 'leaveFamily' })
+      return null
+    } catch (error) {
+      return toAuthError(error)
+    }
+  }, [mutate])
 
-  const dissolveFamily = useCallback((): AuthError | null => {
-    let error: AuthError | null = null
-    setState((s) => {
-      if (!s.sessionAccountId) {
-        error = 'badLogin'
-        return s
-      }
-      const mine = memberForAccount(s, s.sessionAccountId)
-      const fam = mine?.familyId
-        ? s.families.find((item) => item.id === mine.familyId)
-        : undefined
-      if (!mine || !fam || fam.ownerAccountId !== s.sessionAccountId) {
-        error = 'notInFamily'
-        return s
-      }
-      const extraKitchens: Kitchen[] = []
-      const members = s.members.map((member) => {
-        if (member.familyId !== fam.id) return member
-        if (member.id === mine.id) return { ...member, familyId: null }
-        const kitchenId = uid()
-        extraKitchens.push(
-          emptyKitchen({
-            id: kitchenId,
-            familyId: null,
-            ownerAccountId: member.accountId,
-          }),
-        )
-        return { ...member, familyId: null, kitchenId }
-      })
-      return {
-        ...s,
-        families: s.families.filter((item) => item.id !== fam.id),
-        members,
-        kitchens: [
-          ...s.kitchens.map((item) =>
-            item.id === mine.kitchenId ? { ...item, familyId: null } : item,
-          ),
-          ...extraKitchens,
-        ],
-        activeMemberId: mine.id,
-      }
-    })
-    return error
-  }, [])
+  const dissolveFamily = useCallback(async (): Promise<AuthError | null> => {
+    try {
+      await mutate({ action: 'dissolveFamily' })
+      return null
+    } catch (error) {
+      return toAuthError(error)
+    }
+  }, [mutate])
 
-  const addManagedMember = useCallback((name: string): AuthError | null => {
-    const trimmed = name.trim()
-    if (!trimmed) return 'nameRequired'
-    let error: AuthError | null = null
-    setState((s) => {
-      if (!s.sessionAccountId) {
-        error = 'badLogin'
-        return s
+  const addManagedMember = useCallback(
+    async (name: string): Promise<AuthError | null> => {
+      try {
+        await mutate({ action: 'addManagedMember', name })
+        return null
+      } catch (error) {
+        return toAuthError(error)
       }
-      const mine = memberForAccount(s, s.sessionAccountId)
-      if (!mine?.familyId) {
-        error = 'notInFamily'
-        return s
-      }
-      const member = emptyMember({
-        id: uid(),
-        accountId: null,
-        familyId: mine.familyId,
-        kitchenId: mine.kitchenId,
-        name: trimmed,
-      })
-      return { ...s, members: [...s.members, member], activeMemberId: member.id }
-    })
-    return error
-  }, [])
+    },
+    [mutate],
+  )
 
-  const removeMember = useCallback((memberId: string): AuthError | null => {
-    let error: AuthError | null = null
-    setState((s) => {
-      if (!s.sessionAccountId) {
-        error = 'badLogin'
-        return s
+  const removeMember = useCallback(
+    async (memberId: string): Promise<AuthError | null> => {
+      try {
+        await mutate({ action: 'removeMember', memberId })
+        return null
+      } catch (error) {
+        return toAuthError(error)
       }
-      const mine = memberForAccount(s, s.sessionAccountId)
-      const target = s.members.find((member) => member.id === memberId)
-      const fam = mine?.familyId
-        ? s.families.find((item) => item.id === mine.familyId)
-        : undefined
-      if (!mine || !target || !fam || fam.ownerAccountId !== s.sessionAccountId) {
-        error = 'notInFamily'
-        return s
-      }
-      if (target.id === mine.id) {
-        error = 'cannotRemoveSelf'
-        return s
-      }
-      if (target.accountId) {
-        const kitchenId = uid()
-        return {
-          ...s,
-          members: s.members.map((member) =>
-            member.id === target.id
-              ? { ...member, familyId: null, kitchenId }
-              : member,
-          ),
-          kitchens: [
-            ...s.kitchens,
-            emptyKitchen({
-              id: kitchenId,
-              familyId: null,
-              ownerAccountId: target.accountId,
-            }),
-          ],
-          activeMemberId: s.activeMemberId === target.id ? mine.id : s.activeMemberId,
-        }
-      }
-      return {
-        ...s,
-        members: s.members.filter((member) => member.id !== target.id),
-        activeMemberId: s.activeMemberId === target.id ? mine.id : s.activeMemberId,
-      }
-    })
-    return error
-  }, [])
+    },
+    [mutate],
+  )
 
   const regenerateInviteCode = useCallback(() => {
-    setState((s) => {
-      if (!s.sessionAccountId) return s
-      const mine = memberForAccount(s, s.sessionAccountId)
-      const fam = mine?.familyId
-        ? s.families.find((item) => item.id === mine.familyId)
-        : undefined
-      if (!fam || fam.ownerAccountId !== s.sessionAccountId) return s
-      const inviteCode = makeInviteCode(
-        new Set(s.families.filter((item) => item.id !== fam.id).map((item) => item.inviteCode)),
-      )
-      return {
-        ...s,
-        families: s.families.map((item) => (item.id === fam.id ? { ...item, inviteCode } : item)),
-      }
-    })
-  }, [])
+    void mutate({ action: 'regenerateInviteCode' })
+  }, [mutate])
 
-  const savePlan = useCallback((plan: CaloriePlan, memberId?: string) => {
-    setState((s) => {
-      const id = memberId ?? s.activeMemberId
-      const member = s.members.find((item) => item.id === id)
-      if (!member) return s
-      const named = plan.input.name.trim() || member.name
-      const nextPlan: CaloriePlan = {
-        ...plan,
-        input: { ...plan.input, name: named },
-      }
-      return patchMember(s, member.id, (item) => ({
-        ...item,
-        name: named,
-        plan: nextPlan,
-      }))
-    })
-  }, [])
+  const savePlan = useCallback(
+    (plan: CaloriePlan, memberId?: string) => {
+      void mutate({ action: 'savePlan', plan, memberId })
+    },
+    [mutate],
+  )
 
-  const clearPlan = useCallback((memberId?: string) => {
-    setState((s) => {
-      const id = memberId ?? s.activeMemberId
-      if (!id) return s
-      return patchMember(s, id, (item) => ({ ...item, plan: null }))
-    })
-  }, [])
+  const clearPlan = useCallback(
+    (memberId?: string) => {
+      void mutate({ action: 'clearPlan', memberId })
+    },
+    [mutate],
+  )
 
   const addEntry = useCallback(
     (
       entry: Omit<FoodEntry, 'id' | 'createdAt' | 'date'> & { date?: string },
       memberIds?: string[],
     ) => {
-      const date = entry.date ?? todayKey()
-      const createdAt = new Date().toISOString()
-      setState((s) => {
-        const targets =
-          memberIds && memberIds.length > 0
-            ? memberIds
-            : s.activeMemberId
-              ? [s.activeMemberId]
-              : []
-        if (targets.length === 0) return s
-        let next = s
-        for (const memberId of targets) {
-          if (!s.members.some((member) => member.id === memberId)) continue
-          const full: FoodEntry = {
-            id: uid(),
-            createdAt,
-            date,
-            meal: entry.meal,
-            name: entry.name,
-            detail: entry.detail,
-            kcal: entry.kcal,
-            protein: entry.protein,
-            carbs: entry.carbs,
-            fat: entry.fat,
-            recipeId: entry.recipeId,
-            servings: entry.servings,
-          }
-          next = patchMember(next, memberId, (item) => ({
-            ...item,
-            entries: [full, ...item.entries],
-          }))
-        }
-        return next
-      })
+      void mutate({ action: 'addEntry', entry, memberIds })
     },
-    [],
+    [mutate],
   )
 
   const logRecipeWithInventory = useCallback(
-    (input: {
+    async (input: {
       meal: MealType
       name: string
       detail?: string
@@ -700,52 +378,14 @@ export function useAppStore() {
       }[]
     }) => {
       if (!input.recipeId || input.portions.length === 0) return false
-      const totalServings = input.portions.reduce((sum, part) => sum + part.servings, 0)
-      if (totalServings <= 0) return false
-      let ok = false
-      const date = todayKey()
-      const createdAt = new Date().toISOString()
-      setState((s) => {
-        const host = activeMemberOf(s) ?? memberForAccount(s, s.sessionAccountId ?? '')
-        const kit = kitchenOf(s, host?.kitchenId)
-        if (!kit) return s
-        const recipe = findMergedRecipe(
-          input.recipeId,
-          kit.customRecipes ?? [],
-          kit.recipeOverrides ?? {},
-        )
-        if (!recipe) return s
-        const needs = recipeNeedsForServings(recipe, totalServings)
-        const nextInv = consumeInventoryLots(kit.inventory ?? [], needs)
-        if (!nextInv) return s
-        let next = patchKitchen(s, kit.id, (item) => ({ ...item, inventory: nextInv }))
-        for (const part of input.portions) {
-          if (!next.members.some((member) => member.id === part.memberId)) continue
-          const full: FoodEntry = {
-            id: uid(),
-            createdAt,
-            date,
-            meal: input.meal,
-            name: input.name,
-            detail: input.detail,
-            kcal: part.kcal,
-            protein: part.protein,
-            carbs: part.carbs,
-            fat: part.fat,
-            recipeId: input.recipeId,
-            servings: part.servings,
-          }
-          next = patchMember(next, part.memberId, (item) => ({
-            ...item,
-            entries: [full, ...item.entries],
-          }))
-        }
-        ok = true
-        return next
-      })
-      return ok
+      try {
+        await mutate({ action: 'logRecipeWithInventory', ...input })
+        return true
+      } catch {
+        return false
+      }
     },
-    [],
+    [mutate],
   )
 
   const recipes = useMemo(
@@ -759,85 +399,52 @@ export function useAppStore() {
     [kitchen],
   )
 
-  const saveRecipe = useCallback((input: Omit<Recipe, 'id'> & { id?: string }) => {
-    const id = input.id ?? `${USER_RECIPE_PREFIX}${uid()}`
-    const recipe: Recipe = {
-      ...input,
-      id,
-      name: input.name.trim() || 'Untitled recipe',
-      nameEs: (input.nameEs || input.name).trim() || 'Untitled recipe',
-      servings: Math.max(1, input.servings || 4),
-      ingredients: input.ingredients.filter((line) => line.ingredientId && line.grams > 0),
-      steps: (input.steps ?? []).map((step) => step.trim()).filter(Boolean),
-    }
-    setState((s) => {
-      const member = activeMemberOf(s)
-      const kit = kitchenOf(s, member?.kitchenId)
-      if (!kit) return s
-      if (isUserRecipe(id) || (kit.customRecipes ?? []).some((item) => item.id === id)) {
-        const list = kit.customRecipes ?? []
-        const idx = list.findIndex((item) => item.id === id)
-        const customRecipes =
-          idx === -1 ? [recipe, ...list] : list.map((item) => (item.id === id ? recipe : item))
-        return patchKitchen(s, kit.id, (item) => ({ ...item, customRecipes }))
+  const saveRecipe = useCallback(
+    (input: Omit<Recipe, 'id'> & { id?: string }) => {
+      const id = input.id ?? `${USER_RECIPE_PREFIX}${uid()}`
+      const recipe: Recipe = {
+        ...input,
+        id,
+        name: input.name.trim() || 'Untitled recipe',
+        nameEs: (input.nameEs || input.name).trim() || 'Untitled recipe',
+        servings: Math.max(1, input.servings || 4),
+        ingredients: input.ingredients.filter((line) => line.ingredientId && line.grams > 0),
+        steps: (input.steps ?? []).map((step) => step.trim()).filter(Boolean),
       }
-      return patchKitchen(s, kit.id, (item) => ({
-        ...item,
-        recipeOverrides: { ...(item.recipeOverrides ?? {}), [id]: recipe },
-      }))
-    })
-    return recipe
-  }, [])
+      void mutate({ action: 'saveRecipe', recipe })
+      return recipe
+    },
+    [mutate],
+  )
 
-  const deleteRecipe = useCallback((id: string) => {
-    setState((s) => {
-      const member = activeMemberOf(s)
-      const kit = kitchenOf(s, member?.kitchenId)
-      if (!kit) return s
-      if (isUserRecipe(id)) {
-        return patchKitchen(s, kit.id, (item) => ({
-          ...item,
-          customRecipes: (item.customRecipes ?? []).filter((row) => row.id !== id),
-        }))
-      }
-      const next = { ...(kit.recipeOverrides ?? {}) }
-      delete next[id]
-      return patchKitchen(s, kit.id, (item) => ({ ...item, recipeOverrides: next }))
-    })
-  }, [])
+  const deleteRecipe = useCallback(
+    (id: string) => {
+      void mutate({ action: 'deleteRecipe', id })
+    },
+    [mutate],
+  )
 
-  const resetRecipe = useCallback((id: string) => {
-    setState((s) => {
-      const member = activeMemberOf(s)
-      const kit = kitchenOf(s, member?.kitchenId)
-      if (!kit) return s
-      const next = { ...(kit.recipeOverrides ?? {}) }
-      delete next[id]
-      return patchKitchen(s, kit.id, (item) => ({ ...item, recipeOverrides: next }))
-    })
-  }, [])
+  const resetRecipe = useCallback(
+    (id: string) => {
+      if (isUserRecipe(id)) return
+      void mutate({ action: 'resetRecipe', id })
+    },
+    [mutate],
+  )
 
-  const removeEntry = useCallback((id: string) => {
-    setState((s) => {
-      const owner = s.members.find((member) => member.entries.some((entry) => entry.id === id))
-      if (!owner) return s
-      return patchMember(s, owner.id, (item) => ({
-        ...item,
-        entries: item.entries.filter((entry) => entry.id !== id),
-      }))
-    })
-  }, [])
+  const removeEntry = useCallback(
+    (id: string) => {
+      void mutate({ action: 'removeEntry', id })
+    },
+    [mutate],
+  )
 
-  const setWater = useCallback((date: string, glasses: number, memberId?: string) => {
-    setState((s) => {
-      const id = memberId ?? s.activeMemberId
-      if (!id) return s
-      return patchMember(s, id, (item) => ({
-        ...item,
-        water: { ...item.water, [date]: Math.max(0, glasses) },
-      }))
-    })
-  }, [])
+  const setWater = useCallback(
+    (date: string, glasses: number, memberId?: string) => {
+      void mutate({ action: 'setWater', date, glasses, memberId })
+    },
+    [mutate],
+  )
 
   const addExercise = useCallback(
     (input: {
@@ -847,112 +454,38 @@ export function useAppStore() {
       date?: string
       members: { memberId: string; kcal: number }[]
     }) => {
-      const date = input.date ?? todayKey()
-      const createdAt = new Date().toISOString()
-      const minutes = Math.max(1, Math.round(input.minutes))
-      setState((s) => {
-        if (input.members.length === 0) return s
-        let next = s
-        for (const part of input.members) {
-          if (!next.members.some((item) => item.id === part.memberId)) continue
-          const full: ExerciseEntry = {
-            id: uid(),
-            createdAt,
-            date,
-            kind: input.kind,
-            name: input.name.trim() || input.kind,
-            minutes,
-            kcal: Math.max(0, Math.round(part.kcal)),
-          }
-          next = patchMember(next, part.memberId, (item) => ({
-            ...item,
-            exercises: [full, ...(item.exercises ?? [])],
-          }))
-        }
-        return next
-      })
+      void mutate({ action: 'addExercise', ...input })
     },
-    [],
+    [mutate],
   )
 
-  const removeExercise = useCallback((id: string) => {
-    setState((s) => {
-      const owner = s.members.find((member) =>
-        (member.exercises ?? []).some((item) => item.id === id),
-      )
-      if (!owner) return s
-      return patchMember(s, owner.id, (item) => ({
-        ...item,
-        exercises: (item.exercises ?? []).filter((row) => row.id !== id),
-      }))
-    })
-  }, [])
+  const removeExercise = useCallback(
+    (id: string) => {
+      void mutate({ action: 'removeExercise', id })
+    },
+    [mutate],
+  )
 
   const addInventoryItem = useCallback(
     (item: Pick<InventoryItem, 'ingredientId' | 'boughtOn' | 'grams'>) => {
-      const grams = clampGrams(item.grams)
-      const boughtOn = clampBoughtOn(item.boughtOn)
-      setState((s) => {
-        const member = activeMemberOf(s)
-        const kit = kitchenOf(s, member?.kitchenId)
-        if (!kit) return s
-        const list = kit.inventory ?? []
-        const idx = list.findIndex(
-          (row) => row.ingredientId === item.ingredientId && row.boughtOn === boughtOn,
-        )
-        if (idx === -1) {
-          const full: InventoryItem = {
-            id: uid(),
-            ingredientId: item.ingredientId,
-            grams,
-            boughtOn,
-            createdAt: new Date().toISOString(),
-          }
-          return patchKitchen(s, kit.id, (row) => ({ ...row, inventory: [full, ...list] }))
-        }
-        const next = [...list]
-        const cur = next[idx]
-        next[idx] = { ...cur, grams: clampGrams(cur.grams + grams) }
-        return patchKitchen(s, kit.id, (row) => ({ ...row, inventory: next }))
-      })
+      void mutate({ action: 'addInventoryItem', ...item })
     },
-    [],
+    [mutate],
   )
 
   const updateInventoryLot = useCallback(
     (id: string, patch: Partial<Pick<InventoryItem, 'grams' | 'boughtOn'>>) => {
-      setState((s) => {
-        const member = activeMemberOf(s)
-        const kit = kitchenOf(s, member?.kitchenId)
-        if (!kit) return s
-        return patchKitchen(s, kit.id, (row) => ({
-          ...row,
-          inventory: (row.inventory ?? []).map((item) => {
-            if (item.id !== id) return item
-            return {
-              ...item,
-              grams: patch.grams !== undefined ? clampGrams(patch.grams) : item.grams,
-              boughtOn:
-                patch.boughtOn !== undefined ? clampBoughtOn(patch.boughtOn) : item.boughtOn,
-            }
-          }),
-        }))
-      })
+      void mutate({ action: 'updateInventoryLot', id, ...patch })
     },
-    [],
+    [mutate],
   )
 
-  const removeInventoryItem = useCallback((id: string) => {
-    setState((s) => {
-      const member = activeMemberOf(s)
-      const kit = kitchenOf(s, member?.kitchenId)
-      if (!kit) return s
-      return patchKitchen(s, kit.id, (row) => ({
-        ...row,
-        inventory: (row.inventory ?? []).filter((item) => item.id !== id),
-      }))
-    })
-  }, [])
+  const removeInventoryItem = useCallback(
+    (id: string) => {
+      void mutate({ action: 'removeInventoryItem', id })
+    },
+    [mutate],
+  )
 
   const gramsOnHand = useCallback(
     (ingredientId: string) =>
@@ -962,90 +495,30 @@ export function useAppStore() {
     [kitchen],
   )
 
-  const addToPurchaseList = useCallback((items: { ingredientId: string; grams: number }[]) => {
-    setState((s) => {
-      const member = activeMemberOf(s)
-      const kit = kitchenOf(s, member?.kitchenId)
-      if (!kit) return s
-      const list = [...(kit.purchaseList ?? [])]
-      for (const item of items) {
-        const grams = clampGrams(item.grams)
-        if (grams <= 0) continue
-        const idx = list.findIndex((row) => row.ingredientId === item.ingredientId)
-        if (idx === -1) {
-          list.unshift({
-            id: uid(),
-            ingredientId: item.ingredientId,
-            grams,
-            createdAt: new Date().toISOString(),
-          })
-        } else {
-          list[idx] = { ...list[idx], grams: clampGrams(list[idx].grams + grams) }
-        }
-      }
-      return patchKitchen(s, kit.id, (row) => ({ ...row, purchaseList: list }))
-    })
-  }, [])
+  const addToPurchaseList = useCallback(
+    (items: { ingredientId: string; grams: number }[]) => {
+      void mutate({ action: 'addToPurchaseList', items })
+    },
+    [mutate],
+  )
 
-  const updatePurchaseItem = useCallback((id: string, grams: number) => {
-    const next = clampGrams(grams)
-    setState((s) => {
-      const member = activeMemberOf(s)
-      const kit = kitchenOf(s, member?.kitchenId)
-      if (!kit) return s
-      return patchKitchen(s, kit.id, (row) => ({
-        ...row,
-        purchaseList: (row.purchaseList ?? []).map((item) =>
-          item.id === id ? { ...item, grams: next } : item,
-        ),
-      }))
-    })
-  }, [])
+  const updatePurchaseItem = useCallback(
+    (id: string, grams: number) => {
+      void mutate({ action: 'updatePurchaseItem', id, grams })
+    },
+    [mutate],
+  )
 
-  const removePurchaseItem = useCallback((id: string) => {
-    setState((s) => {
-      const member = activeMemberOf(s)
-      const kit = kitchenOf(s, member?.kitchenId)
-      if (!kit) return s
-      return patchKitchen(s, kit.id, (row) => ({
-        ...row,
-        purchaseList: (row.purchaseList ?? []).filter((item) => item.id !== id),
-      }))
-    })
-  }, [])
+  const removePurchaseItem = useCallback(
+    (id: string) => {
+      void mutate({ action: 'removePurchaseItem', id })
+    },
+    [mutate],
+  )
 
   const completePurchaseList = useCallback(() => {
-    const boughtOn = todayKey()
-    setState((s) => {
-      const member = activeMemberOf(s)
-      const kit = kitchenOf(s, member?.kitchenId)
-      if (!kit) return s
-      let inventory = [...(kit.inventory ?? [])]
-      for (const item of kit.purchaseList ?? []) {
-        const grams = clampGrams(item.grams)
-        if (grams <= 0) continue
-        const idx = inventory.findIndex(
-          (lot) => lot.ingredientId === item.ingredientId && lot.boughtOn === boughtOn,
-        )
-        if (idx === -1) {
-          inventory = [
-            {
-              id: uid(),
-              ingredientId: item.ingredientId,
-              grams,
-              boughtOn,
-              createdAt: new Date().toISOString(),
-            },
-            ...inventory,
-          ]
-        } else {
-          const cur = inventory[idx]
-          inventory[idx] = { ...cur, grams: clampGrams(cur.grams + grams) }
-        }
-      }
-      return patchKitchen(s, kit.id, (row) => ({ ...row, inventory, purchaseList: [] }))
-    })
-  }, [])
+    void mutate({ action: 'completePurchaseList' })
+  }, [mutate])
 
   const today = todayKey()
   const entries = activeMember?.entries ?? []
@@ -1157,6 +630,7 @@ export function useAppStore() {
   )
 
   return {
+    status,
     account,
     myMember,
     activeMember,
@@ -1166,7 +640,7 @@ export function useAppStore() {
     householdGoal,
     householdMacros,
     isOwner,
-    isLoggedIn: Boolean(account),
+    isLoggedIn: status === 'ready' && Boolean(account),
     plan,
     entries,
     water,
@@ -1174,8 +648,8 @@ export function useAppStore() {
     purchaseList: kitchen?.purchaseList ?? [],
     customRecipes: kitchen?.customRecipes ?? [],
     recipeOverrides: kitchen?.recipeOverrides ?? {},
-    theme: state.theme,
-    locale: state.locale ?? 'en',
+    theme,
+    locale,
     setLocale,
     today,
     todayEntries,

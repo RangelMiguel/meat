@@ -1,0 +1,185 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  // Direct (non-pooled) URL for migrations. Optional on local Postgres.
+  // Neon/Supabase: use the non-pooled connection string here.
+  directUrl = env("DIRECT_URL")
+}
+
+model User {
+  id           String   @id @default(cuid())
+  email        String   @unique
+  /// Null = passkey-only account (password auth disabled)
+  passwordHash String?
+  displayName  String
+  locale       String   @default("en")
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  memberships       Membership[]
+  householdsCreated Household[]     @relation("HouseholdCreator")
+  preferences       UserPreference?
+  members           Member[]
+}
+
+model Household {
+  id         String   @id @default(cuid())
+  name       String
+  inviteCode String   @unique
+  /// personal kitchen vs named shared family
+  shared     Boolean  @default(false)
+  createdBy  String?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  creator     User?            @relation("HouseholdCreator", fields: [createdBy], references: [id])
+  memberships Membership[]
+  preferences UserPreference[]
+  members     Member[]
+  kitchen     Kitchen?
+}
+
+model Membership {
+  id          String   @id @default(cuid())
+  householdId String
+  userId      String
+  /// owner | admin | member | viewer
+  role        String   @default("member")
+  visibility  String   @default("{}")
+  createdAt   DateTime @default(now())
+
+  household Household @relation(fields: [householdId], references: [id], onDelete: Cascade)
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([householdId, userId])
+  @@index([userId])
+}
+
+model UserPreference {
+  id             String  @id @default(cuid())
+  userId         String  @unique
+  householdId    String?
+  theme          String  @default("grove")
+  locale         String  @default("en")
+  activeMemberId String?
+
+  user      User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  household Household? @relation(fields: [householdId], references: [id], onDelete: SetNull)
+}
+
+model Member {
+  id          String   @id @default(cuid())
+  householdId String
+  /// Linked login. Null for a managed profile (e.g. a child).
+  userId      String?
+  name        String
+  planJson    String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  household Household        @relation(fields: [householdId], references: [id], onDelete: Cascade)
+  user      User?            @relation(fields: [userId], references: [id], onDelete: SetNull)
+  entries   FoodEntry[]
+  exercises ExerciseEntry[]
+  waterLogs WaterLog[]
+
+  @@index([householdId])
+  @@index([userId])
+}
+
+model Kitchen {
+  id            String @id @default(cuid())
+  householdId   String @unique
+  recipesJson   String @default("[]")
+  overridesJson String @default("{}")
+
+  household Household       @relation(fields: [householdId], references: [id], onDelete: Cascade)
+  inventory InventoryItem[]
+  purchases PurchaseItem[]
+}
+
+model FoodEntry {
+  id        String   @id @default(cuid())
+  memberId  String
+  date      String
+  meal      String
+  name      String
+  detail    String?
+  kcal      Float
+  protein   Float
+  carbs     Float
+  fat       Float
+  recipeId  String?
+  servings  Float?
+  createdAt DateTime @default(now())
+
+  member Member @relation(fields: [memberId], references: [id], onDelete: Cascade)
+
+  @@index([memberId, date])
+}
+
+model ExerciseEntry {
+  id        String   @id @default(cuid())
+  memberId  String
+  date      String
+  kind      String
+  name      String
+  minutes   Int
+  kcal      Int
+  createdAt DateTime @default(now())
+
+  member Member @relation(fields: [memberId], references: [id], onDelete: Cascade)
+
+  @@index([memberId, date])
+}
+
+model WaterLog {
+  id      String @id @default(cuid())
+  memberId String
+  date    String
+  glasses Int    @default(0)
+
+  member Member @relation(fields: [memberId], references: [id], onDelete: Cascade)
+
+  @@unique([memberId, date])
+}
+
+model InventoryItem {
+  id           String   @id @default(cuid())
+  kitchenId    String
+  ingredientId String
+  grams        Float
+  boughtOn     String
+  createdAt    DateTime @default(now())
+
+  kitchen Kitchen @relation(fields: [kitchenId], references: [id], onDelete: Cascade)
+
+  @@index([kitchenId, ingredientId])
+}
+
+model PurchaseItem {
+  id           String   @id @default(cuid())
+  kitchenId    String
+  ingredientId String
+  grams        Float
+  createdAt    DateTime @default(now())
+
+  kitchen Kitchen @relation(fields: [kitchenId], references: [id], onDelete: Cascade)
+
+  @@index([kitchenId])
+}
+
+/// Sliding-window rate limit counters (works on serverless without Redis)
+model RateLimitBucket {
+  id          String   @id @default(cuid())
+  key         String   @unique
+  count       Int      @default(0)
+  windowStart DateTime
+  updatedAt   DateTime @updatedAt
+
+  @@index([windowStart])
+}

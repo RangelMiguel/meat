@@ -124,8 +124,6 @@ export interface Account {
   id: string
   email: string
   displayName: string
-  passwordHash: string
-  passwordSalt: string
   createdAt: string
 }
 

@@ -24,19 +24,19 @@ export function FamilyView({ store, onOpenMember }: Props) {
     setError(t(locale, code as MsgId))
   }
 
-  const handleCreate = (e: FormEvent) => {
+  const handleCreate = async (e: FormEvent) => {
     e.preventDefault()
-    showError(store.createFamily(familyName))
+    showError(await store.createFamily(familyName))
   }
 
-  const handleJoin = (e: FormEvent) => {
+  const handleJoin = async (e: FormEvent) => {
     e.preventDefault()
-    showError(store.joinFamily(invite))
+    showError(await store.joinFamily(invite))
   }
 
-  const handleAddProfile = (e: FormEvent) => {
+  const handleAddProfile = async (e: FormEvent) => {
     e.preventDefault()
-    const result = store.addManagedMember(profileName)
+    const result = await store.addManagedMember(profileName)
     showError(result)
     if (!result) {
       setProfileName('')
@@ -61,7 +61,7 @@ export function FamilyView({ store, onOpenMember }: Props) {
             </div>
           )}
           <div className="grid-2" style={{ marginTop: '1rem' }}>
-            <form className="stack-lg" onSubmit={handleCreate}>
+            <form className="stack-lg" onSubmit={(e) => void handleCreate(e)}>
               <h4>{t(locale, 'createFamily')}</h4>
               <div className="field">
                 <label htmlFor="fam-name">{t(locale, 'familyName')}</label>
@@ -77,7 +77,7 @@ export function FamilyView({ store, onOpenMember }: Props) {
                 {t(locale, 'createFamily')}
               </button>
             </form>
-            <form className="stack-lg" onSubmit={handleJoin}>
+            <form className="stack-lg" onSubmit={(e) => void handleJoin(e)}>
               <h4>{t(locale, 'joinFamily')}</h4>
               <div className="field">
                 <label htmlFor="fam-code">{t(locale, 'inviteCode')}</label>
@@ -172,7 +172,7 @@ export function FamilyView({ store, onOpenMember }: Props) {
                     aria-label={t(locale, 'removeMember')}
                     onClick={() => {
                       if (!confirm(t(locale, 'removeMemberConfirm', { name: member.name }))) return
-                      showError(store.removeMember(member.id))
+                      void store.removeMember(member.id).then(showError)
                     }}
                   >
                     <Trash2 size={15} />
@@ -205,7 +205,7 @@ export function FamilyView({ store, onOpenMember }: Props) {
         </div>
       </div>
 
-      <form className="card" onSubmit={handleAddProfile}>
+      <form className="card" onSubmit={(e) => void handleAddProfile(e)}>
         <div className="card-header">
           <div>
             <h4>{t(locale, 'addProfile')}</h4>
@@ -244,10 +244,10 @@ export function FamilyView({ store, onOpenMember }: Props) {
           onClick={() => {
             if (store.isOwner) {
               if (!confirm(t(locale, 'dissolveFamilyConfirm'))) return
-              showError(store.dissolveFamily())
+              void store.dissolveFamily().then(showError)
             } else {
               if (!confirm(t(locale, 'leaveFamilyConfirm'))) return
-              showError(store.leaveFamily())
+              void store.leaveFamily().then(showError)
             }
           }}
         >

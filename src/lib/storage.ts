@@ -162,12 +162,7 @@ function parseAccounts(raw: unknown): Account[] {
   return raw.flatMap((item) => {
     if (!item || typeof item !== 'object') return []
     const rec = item as Partial<Account>
-    if (
-      typeof rec.id !== 'string' ||
-      typeof rec.email !== 'string' ||
-      typeof rec.passwordHash !== 'string' ||
-      typeof rec.passwordSalt !== 'string'
-    ) {
+    if (typeof rec.id !== 'string' || typeof rec.email !== 'string') {
       return []
     }
     return [
@@ -175,8 +170,6 @@ function parseAccounts(raw: unknown): Account[] {
         id: rec.id,
         email: rec.email,
         displayName: typeof rec.displayName === 'string' ? rec.displayName : rec.email,
-        passwordHash: rec.passwordHash,
-        passwordSalt: rec.passwordSalt,
         createdAt: typeof rec.createdAt === 'string' ? rec.createdAt : new Date().toISOString(),
       },
     ]

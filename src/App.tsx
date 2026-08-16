@@ -142,7 +142,16 @@ export default function App() {
       </header>
 
       <main className="main container">
-        {!store.isLoggedIn ? (
+        {store.status === 'loading' ? (
+          <div className="card auth-card">
+            <div className="card-header">
+              <div>
+                <h2>meat</h2>
+                <p className="sub">{t(locale, 'loadingSession')}</p>
+              </div>
+            </div>
+          </div>
+        ) : !store.isLoggedIn ? (
           <AuthView store={store} />
         ) : cookSession ? (
           <CookView
