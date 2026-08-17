@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import {
   BookOpen,
   CalendarDays,
+  CalendarRange,
   ClipboardList,
   Dumbbell,
   Flame,
@@ -18,6 +19,7 @@ import { PlanForm } from './components/PlanForm'
 import { PurchaseView } from './components/PurchaseView'
 import { RecipesView } from './components/RecipesView'
 import { SettingsView } from './components/SettingsView'
+import { WeekPlanView } from './components/WeekPlanView'
 import { TodayView } from './components/TodayView'
 import { PwaProvider } from './components/PwaProvider'
 import { assertCatalogIntegrity } from './data/catalog'
@@ -103,6 +105,14 @@ export default function App() {
             >
               <ClipboardList size={16} />
               {t(locale, 'navPlan')}
+            </button>
+            <button
+              type="button"
+              className={`nav-btn${view === 'week' ? ' is-active' : ''}`}
+              onClick={() => goTo('week')}
+            >
+              <CalendarRange size={16} />
+              {t(locale, 'navWeek')}
             </button>
             <button
               type="button"
@@ -222,7 +232,7 @@ export default function App() {
                     existing={planMember.plan}
                     onSave={(plan) => {
                       store.savePlan(plan, planMember.id)
-                      goTo('today')
+                      goTo('week')
                     }}
                   />
                 )}
@@ -246,6 +256,15 @@ export default function App() {
                   </div>
                 )}
               </div>
+            )}
+            {view === 'week' && (
+              <WeekPlanView
+                store={store}
+                memberId={planMember?.id ?? ''}
+                onSelectMember={setPlanMemberId}
+                onNeedPlan={() => goTo('plan')}
+                onGoPurchase={() => goTo('purchase')}
+              />
             )}
             {view === 'recipes' && (
               <RecipesView

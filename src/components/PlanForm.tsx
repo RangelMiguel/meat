@@ -1,5 +1,5 @@
 import { useMemo, useState, type FormEvent } from 'react'
-import { Calculator, Save } from 'lucide-react'
+import { Calculator, CalendarRange, Save } from 'lucide-react'
 import { activityCopy, t, type Locale } from '../i18n'
 import { buildPlan } from '../lib/calories'
 import {
@@ -294,6 +294,12 @@ export function PlanForm({ locale, existing, onSave }: Props) {
             <p className="plan-note">
               {goalCopy(shown.input.goal, shown.tdee, shown.dailyCalories, shown.input.weeklyChangeKg)}
             </p>
+            <p className="field-hint">{t(locale, 'planWeekHint')}</p>
+            <div className="btn-row" style={{ marginTop: '0.85rem' }}>
+              <button className="btn btn-primary" type="button" onClick={runSave}>
+                <CalendarRange size={16} /> {t(locale, 'planThisWeek')}
+              </button>
+            </div>
           </>
         ) : (
           <div className="empty-results">

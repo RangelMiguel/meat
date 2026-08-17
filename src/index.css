@@ -2530,3 +2530,174 @@ tbody tr:hover td {
   font-size: 0.74rem;
   color: var(--text-muted);
 }
+
+/* week planner */
+.week-nav-card {
+  padding-bottom: 0.85rem;
+}
+
+.week-nav {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+.week-nav-copy {
+  text-align: center;
+}
+
+.week-nav-copy strong {
+  display: block;
+  font-size: 1rem;
+}
+
+.week-nav-copy span {
+  font-size: 0.78rem;
+  color: var(--text-muted);
+}
+
+.week-nav-actions {
+  display: flex;
+  justify-content: center;
+  margin-top: 0.45rem;
+}
+
+.week-days {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.week-day-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  margin-bottom: 0.65rem;
+}
+
+.week-day.is-past {
+  opacity: 0.78;
+}
+
+.week-slots {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 0.45rem;
+}
+
+.week-slot {
+  display: grid;
+  grid-template-columns: 5.5rem 1fr;
+  gap: 0.55rem;
+  align-items: start;
+  padding: 0.5rem 0.55rem;
+  background: var(--surface-2);
+  border: var(--border-width) solid var(--border);
+  border-radius: var(--radius-sm);
+}
+
+.week-slot-meal {
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: var(--text-muted);
+  padding-top: 0.35rem;
+}
+
+.week-slot-body {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.45rem;
+}
+
+.week-slot-copy strong {
+  display: block;
+  font-size: 0.9rem;
+}
+
+.week-slot-copy p {
+  margin: 0.1rem 0 0;
+  font-size: 0.74rem;
+  color: var(--text-muted);
+}
+
+.week-slot-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+.week-servings {
+  min-width: 1.6rem;
+  text-align: center;
+  font-size: 0.82rem;
+  font-weight: 700;
+}
+
+.week-slot-add {
+  appearance: none;
+  border: 1px dashed var(--border);
+  background: transparent;
+  color: var(--text-muted);
+  border-radius: var(--radius-sm);
+  padding: 0.4rem 0.55rem;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  font-weight: 600;
+  font-size: 0.8rem;
+  cursor: pointer;
+}
+
+.week-slot-add:hover {
+  color: var(--primary);
+  border-color: var(--primary);
+}
+
+.week-shop-layout {
+  display: grid;
+  gap: 1rem;
+}
+
+@media (min-width: 960px) {
+  .week-shop-layout {
+    grid-template-columns: 1fr 1fr;
+    align-items: start;
+  }
+}
+
+.storage-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 0.7rem;
+}
+
+.storage-item strong {
+  display: block;
+  font-size: 0.9rem;
+}
+
+.storage-item p {
+  margin: 0.2rem 0 0;
+  font-size: 0.8rem;
+  color: var(--text-muted);
+}
+
+.week-picker-modal {
+  width: min(640px, 100%);
+  max-height: min(88vh, 760px);
+  overflow: auto;
+}
+
+.week-picker-grid {
+  margin: 0.75rem 0 1rem;
+  max-height: 42vh;
+  overflow: auto;
+}

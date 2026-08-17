@@ -14,12 +14,27 @@ export type MealType = 'Breakfast' | 'Lunch' | 'Dinner' | 'Snack'
 export type View =
   | 'today'
   | 'plan'
+  | 'week'
   | 'history'
   | 'recipes'
   | 'inventory'
   | 'purchase'
   | 'exercise'
   | 'settings'
+
+/** One planned dish for a person on a given day and meal. */
+export interface WeekMealSlot {
+  id: string
+  date: string
+  meal: MealType
+  recipeId: string
+  servings: number
+  memberId: string
+}
+
+export interface WeekPlan {
+  slots: WeekMealSlot[]
+}
 
 export type ExerciseKind =
   | 'walk'
@@ -158,6 +173,7 @@ export interface Kitchen {
   purchaseList: PurchaseItem[]
   customRecipes: Recipe[]
   recipeOverrides: Record<string, Recipe>
+  weekPlan: WeekPlan
 }
 
 /** Snapshot of pre-account local data, applied on first sign-up. */

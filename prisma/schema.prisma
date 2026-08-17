@@ -95,8 +95,10 @@ model Member {
 model Kitchen {
   id            String @id @default(cuid())
   householdId   String @unique
-  recipesJson   String @default("[]")
-  overridesJson String @default("{}")
+  recipesJson       String @default("[]")
+  overridesJson     String @default("{}")
+  weekPlanJson      String @default("{}")
+  integrationsJson  String @default("{}")
 
   household Household       @relation(fields: [householdId], references: [id], onDelete: Cascade)
   inventory InventoryItem[]

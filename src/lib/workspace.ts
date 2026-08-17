@@ -6,6 +6,16 @@ import { createHouseholdWithOwner } from './household'
 import { normalizeInviteCode, uniqueInviteCode } from './invite'
 import { clampBoughtOn, clampGrams, todayKey } from './calories'
 import { consumeInventoryLots, recipeNeedsForServings } from './portions'
+import { parseWeekPlan } from './weekPlan'
+import {
+  normalizeFinanceUrl,
+  parseFinanceLink,
+  postMeatPurchase,
+  publicFinanceLink,
+  purchaseItemsForFinance,
+  serializeFinanceLink,
+  testMeatConnection,
+} from './finance'
 import {
   findMergedRecipe,
   isUserRecipe,
@@ -25,6 +35,7 @@ import type {
   MealType,
   Member,
   PurchaseItem,
+  WeekMealSlot,
 } from '../types'
 import type { Locale } from '../i18n'
 import { defaultTheme, themes, type ThemeId } from '../themes'
@@ -175,6 +186,15 @@ function toKitchen(household: LoadedHousehold, kitchen: NonNullable<LoadedHouseh
     ),
     customRecipes: parseRecipes(kitchen.recipesJson),
     recipeOverrides: parseOverrides(kitchen.overridesJson),
+    weekPlan: parseWeekPlan(safeJson(kitchen.weekPlanJson)),
+  }
+}
+
+function safeJson(raw: string): unknown {
+  try {
+    return JSON.parse(raw)
+  } catch {
+    return {}
   }
 }
 
@@ -215,6 +235,7 @@ export function serializeWorkspace(
     activeMemberId: active,
     theme: parseTheme(pref?.theme),
     locale: parseLocale(pref?.locale || user.locale),
+    finance: publicFinanceLink(parseFinanceLink(safeJson(kitchen.integrationsJson))),
   }
 }
 
@@ -384,7 +405,32 @@ const actionSchema = z.discriminatedUnion('action', [
   }),
   z.object({ action: z.literal('updatePurchaseItem'), id: z.string(), grams: z.number() }),
   z.object({ action: z.literal('removePurchaseItem'), id: z.string() }),
-  z.object({ action: z.literal('completePurchaseList') }),
+  z.object({
+    action: z.literal('completePurchaseList'),
+    spendAmount: z.number().optional(),
+    spendNote: z.string().optional(),
+    skipFinance: z.boolean().optional(),
+  }),
+  z.object({
+    action: z.literal('saveFinanceIntegration'),
+    enabled: z.boolean(),
+    baseUrl: z.string(),
+    token: z.string().optional(),
+  }),
+  z.object({ action: z.literal('testFinanceIntegration') }),
+  z.object({
+    action: z.literal('saveWeekPlan'),
+    slots: z.array(
+      z.object({
+        id: z.string(),
+        date: z.string(),
+        meal: z.enum(['Breakfast', 'Lunch', 'Dinner', 'Snack']),
+        recipeId: z.string(),
+        servings: z.number(),
+        memberId: z.string(),
+      }),
+    ),
+  }),
   z.object({ action: z.literal('saveRecipe'), recipe: recipeSchema }),
   z.object({ action: z.literal('deleteRecipe'), id: z.string() }),
   z.object({ action: z.literal('resetRecipe'), id: z.string() }),
@@ -461,11 +507,15 @@ async function mergeKitchenInto(targetKitchenId: string, sourceKitchenId: string
     ...parseOverrides(source.overridesJson),
     ...parseOverrides(target.overridesJson),
   }
+  const targetFinance = parseFinanceLink(safeJson(target.integrationsJson))
+  const sourceFinance = parseFinanceLink(safeJson(source.integrationsJson))
+  const finance = targetFinance.token ? targetFinance : sourceFinance
   await prisma.kitchen.update({
     where: { id: target.id },
     data: {
       recipesJson: JSON.stringify(recipes),
       overridesJson: JSON.stringify(overrides),
+      integrationsJson: serializeFinanceLink(finance),
     },
   })
 }
@@ -871,9 +921,62 @@ export async function mutateWorkspace(userId: string, raw: unknown): Promise<Wor
       })
       break
     }
+    case 'saveWeekPlan': {
+      const slots: WeekMealSlot[] = body.slots
+        .filter((slot) => slot.servings > 0 && /^\d{4}-\d{2}-\d{2}$/.test(slot.date))
+        .map((slot) => ({
+          id: slot.id,
+          date: slot.date,
+          meal: slot.meal,
+          recipeId: slot.recipeId,
+          servings: slot.servings,
+          memberId: slot.memberId,
+        }))
+      await prisma.kitchen.update({
+        where: { id: household.kitchen!.id },
+        data: { weekPlanJson: JSON.stringify({ slots }) },
+      })
+      break
+    }
+    case 'saveFinanceIntegration': {
+      const kitchen = household.kitchen!
+      const current = parseFinanceLink(safeJson(kitchen.integrationsJson))
+      const nextToken = body.token?.trim()
+      const cfg = {
+        ...current,
+        enabled: body.enabled,
+        baseUrl: normalizeFinanceUrl(body.baseUrl),
+        token: nextToken ? nextToken : current.token,
+      }
+      await prisma.kitchen.update({
+        where: { id: kitchen.id },
+        data: { integrationsJson: serializeFinanceLink(cfg) },
+      })
+      break
+    }
+    case 'testFinanceIntegration': {
+      const kitchen = household.kitchen!
+      const cfg = parseFinanceLink(safeJson(kitchen.integrationsJson))
+      if (!cfg.baseUrl || !cfg.token) {
+        throw new BadRequestError('financeNotConfigured')
+      }
+      const result = await testMeatConnection({ baseUrl: cfg.baseUrl, token: cfg.token })
+      const next = {
+        ...cfg,
+        lastStatus: result.ok ? ('ok' as const) : ('error' as const),
+        lastError: result.ok ? null : result.error,
+        lastAt: new Date().toISOString(),
+      }
+      await prisma.kitchen.update({
+        where: { id: kitchen.id },
+        data: { integrationsJson: serializeFinanceLink(next) },
+      })
+      break
+    }
     case 'completePurchaseList': {
       const kitchen = household.kitchen!
       const boughtOn = todayKey()
+      const shopItems = kitchen.purchases.filter((item) => item.grams > 0)
       for (const item of kitchen.purchases) {
         const grams = clampGrams(item.grams)
         if (grams <= 0) continue
@@ -897,6 +1000,46 @@ export async function mutateWorkspace(userId: string, raw: unknown): Promise<Wor
         }
       }
       await prisma.purchaseItem.deleteMany({ where: { kitchenId: kitchen.id } })
+
+      const finance = parseFinanceLink(safeJson(kitchen.integrationsJson))
+      const amount = Number(body.spendAmount)
+      const shouldSend =
+        !body.skipFinance &&
+        finance.enabled &&
+        Boolean(finance.baseUrl && finance.token) &&
+        Number.isFinite(amount) &&
+        amount > 0
+      if (shouldSend) {
+        const items = purchaseItemsForFinance(
+          shopItems.map((item) => ({
+            id: item.id,
+            ingredientId: item.ingredientId,
+            grams: item.grams,
+            createdAt: item.createdAt.toISOString(),
+          })),
+        )
+        const note = body.spendNote?.trim()
+        const result = await postMeatPurchase({
+          baseUrl: finance.baseUrl,
+          token: finance.token,
+          amount,
+          date: boughtOn,
+          description: note || `meat grocery shop (${items.length})`,
+          items,
+          clientMutationId: `meat-${kitchen.id}-${boughtOn}-${Date.now()}`,
+        })
+        await prisma.kitchen.update({
+          where: { id: kitchen.id },
+          data: {
+            integrationsJson: serializeFinanceLink({
+              ...finance,
+              lastStatus: result.ok ? 'ok' : 'error',
+              lastError: result.ok ? null : result.error,
+              lastAt: new Date().toISOString(),
+            }),
+          },
+        })
+      }
       break
     }
     case 'saveRecipe': {

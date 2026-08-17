@@ -21,6 +21,7 @@ import type {
   Kitchen,
   Member,
   MealType,
+  WeekMealSlot,
 } from '../types'
 
 type AuthError =
@@ -571,9 +572,35 @@ export function useAppStore() {
     [mutate],
   )
 
-  const completePurchaseList = useCallback(() => {
-    void mutate({ action: 'completePurchaseList' })
+  const completePurchaseList = useCallback(
+    (input?: { spendAmount?: number; spendNote?: string; skipFinance?: boolean }) => {
+      void mutate({ action: 'completePurchaseList', ...input })
+    },
+    [mutate],
+  )
+
+  const saveFinanceIntegration = useCallback(
+    (input: { enabled: boolean; baseUrl: string; token?: string }) => {
+      void mutate({ action: 'saveFinanceIntegration', ...input })
+    },
+    [mutate],
+  )
+
+  const testFinanceIntegration = useCallback(async () => {
+    try {
+      const next = await mutate({ action: 'testFinanceIntegration' })
+      return next.finance
+    } catch {
+      return null
+    }
   }, [mutate])
+
+  const saveWeekPlan = useCallback(
+    (slots: WeekMealSlot[]) => {
+      void mutate({ action: 'saveWeekPlan', slots })
+    },
+    [mutate],
+  )
 
   const today = todayKey()
   const entries = activeMember?.entries ?? []
@@ -701,6 +728,15 @@ export function useAppStore() {
     water,
     inventory: kitchen?.inventory ?? [],
     purchaseList: kitchen?.purchaseList ?? [],
+    finance: workspace?.finance ?? {
+      enabled: false,
+      baseUrl: '',
+      hasToken: false,
+      lastStatus: 'idle' as const,
+      lastError: null,
+      lastAt: null,
+    },
+    weekPlan: kitchen?.weekPlan ?? { slots: [] },
     customRecipes: kitchen?.customRecipes ?? [],
     recipeOverrides: kitchen?.recipeOverrides ?? {},
     theme,
@@ -743,6 +779,9 @@ export function useAppStore() {
     updatePurchaseItem,
     removePurchaseItem,
     completePurchaseList,
+    saveFinanceIntegration,
+    testFinanceIntegration,
+    saveWeekPlan,
     recipes,
     recipeById,
     saveRecipe,
