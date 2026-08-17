@@ -2,15 +2,8 @@ import { useMemo, useState, type FormEvent } from 'react'
 import { Calculator, CalendarRange, Save } from 'lucide-react'
 import { activityCopy, t, type Locale } from '../i18n'
 import { buildPlan } from '../lib/calories'
-import {
-  ACTIVITY_OPTIONS,
-  GOAL_OPTIONS,
-  type CaloriePlan,
-  type Goal,
-  type PlanInput,
-  type Sex,
-  type ActivityLevel,
-} from '../types'
+import { ACTIVITY_OPTIONS, type CaloriePlan, type Goal, type PlanInput, type Sex, type ActivityLevel } from '../types'
+import { applyPace, GOAL_PACES, paceFromInput, paceIndex, type GoalPace } from '../lib/planPace'
 
 interface Props {
   locale: Locale
@@ -48,9 +41,6 @@ export function PlanForm({ locale, existing, onSave }: Props) {
     if (form.age < 15 || form.age > 100) e.push(t(locale, 'errAge'))
     if (form.heightCm < 120 || form.heightCm > 230) e.push(t(locale, 'errHeight'))
     if (form.weightKg < 35 || form.weightKg > 300) e.push(t(locale, 'errWeight'))
-    if (form.goal !== 'maintain' && (form.weeklyChangeKg < 0.1 || form.weeklyChangeKg > 1)) {
-      e.push(t(locale, 'errWeight'))
-    }
     return e
   }
 
@@ -190,40 +180,16 @@ export function PlanForm({ locale, existing, onSave }: Props) {
             </select>
           </div>
 
-          <fieldset className="segment-field">
-            <legend>{t(locale, 'goal')}</legend>
-            <div className="segment segment-3">
-              {GOAL_OPTIONS.map((opt) => (
-                <button
-                  key={opt.value}
-                  type="button"
-                  className={`segment-btn${form.goal === opt.value ? ' is-active' : ''}`}
-                  onClick={() => update('goal', opt.value as Goal)}
-                  title={opt.value === 'lose' ? t(locale, 'goalLoseHint') : opt.value === 'gain' ? t(locale, 'goalGainHint') : t(locale, 'goalMaintainHint')}
-                >
-                  {opt.value === 'lose' ? t(locale, 'goalLose') : opt.value === 'gain' ? t(locale, 'goalGain') : t(locale, 'goalMaintain')}
-                </button>
-              ))}
-            </div>
-          </fieldset>
-
-          {form.goal !== 'maintain' && (
-            <div className="field">
-              <label htmlFor="weekly">
-                {form.goal === 'lose' ? t(locale, 'weeklyLoss') : t(locale, 'weeklyGain')}
-              </label>
-              <input
-                id="weekly"
-                type="number"
-                min={0.1}
-                max={1}
-                step={0.1}
-                value={form.weeklyChangeKg}
-                onChange={(e) => update('weeklyChangeKg', Number(e.target.value))}
-              />
-              <p className="field-hint">{t(locale, 'weeklyHint')}</p>
-            </div>
-          )}
+          <GoalPaceSlider
+            locale={locale}
+            value={paceFromInput(form)}
+            onChange={(pace) => {
+              const next = applyPace(pace)
+              setForm((f) => ({ ...f, ...next }))
+              setPreview(null)
+              setSavedFlash(false)
+            }}
+          />
 
           <div className="btn-row">
             <button className="btn btn-secondary" type="submit">
@@ -292,7 +258,7 @@ export function PlanForm({ locale, existing, onSave }: Props) {
               </div>
             </div>
             <p className="plan-note">
-              {goalCopy(shown.input.goal, shown.tdee, shown.dailyCalories, shown.input.weeklyChangeKg)}
+              {goalCopy(locale, shown.input.goal, shown.tdee, shown.dailyCalories, shown.input.weeklyChangeKg)}
             </p>
             <p className="field-hint">{t(locale, 'planWeekHint')}</p>
             <div className="btn-row" style={{ marginTop: '0.85rem' }}>
@@ -324,13 +290,79 @@ function sameInput(a: PlanInput, b: PlanInput): boolean {
   )
 }
 
-function goalCopy(goal: Goal, tdee: number, daily: number, weekly: number): string {
+function GoalPaceSlider({
+  locale,
+  value,
+  onChange,
+}: {
+  locale: Locale
+  value: GoalPace
+  onChange: (pace: GoalPace) => void
+}) {
+  const index = paceIndex(value)
+  const selected = GOAL_PACES[index]
+  return (
+    <fieldset className="goal-pace" data-pace={value}>
+      <legend>{t(locale, 'goal')}</legend>
+      <label className="goal-pace-control" htmlFor="goal-pace">
+        <span className="sr-only">{t(locale, 'goal')}</span>
+        <input
+          id="goal-pace"
+          type="range"
+          min={0}
+          max={GOAL_PACES.length - 1}
+          step={1}
+          value={index}
+          onChange={(e) => onChange(GOAL_PACES[Number(e.target.value)].id)}
+        />
+      </label>
+      <div className="goal-pace-ticks" aria-hidden>
+        {GOAL_PACES.map((pace, i) => (
+          <button
+            key={pace.id}
+            type="button"
+            className={`goal-pace-tick${i === index ? ' is-active' : ''}`}
+            data-pace={pace.id}
+            onClick={() => onChange(pace.id)}
+          >
+            <span className="goal-pace-dot" />
+            <span className="goal-pace-label">{t(locale, paceLabelKey(pace.id))}</span>
+          </button>
+        ))}
+      </div>
+      <p className="field-hint">
+        {t(locale, paceHintKey(value))}
+        {selected.goal === 'maintain'
+          ? ''
+          : ` · ${t(locale, 'goalPaceWeekly', { kg: selected.weeklyChangeKg })}`}
+      </p>
+    </fieldset>
+  )
+}
+
+function paceLabelKey(pace: GoalPace) {
+  if (pace === 'lose_fast') return 'goalPaceLoseFast' as const
+  if (pace === 'lose') return 'goalPaceLose' as const
+  if (pace === 'maintain') return 'goalPaceMaintain' as const
+  if (pace === 'gain') return 'goalPaceGain' as const
+  return 'goalPaceGainFast' as const
+}
+
+function paceHintKey(pace: GoalPace) {
+  if (pace === 'lose_fast') return 'goalPaceLoseFastHint' as const
+  if (pace === 'lose') return 'goalPaceLoseHint' as const
+  if (pace === 'maintain') return 'goalPaceMaintainHint' as const
+  if (pace === 'gain') return 'goalPaceGainHint' as const
+  return 'goalPaceGainFastHint' as const
+}
+
+function goalCopy(locale: Locale, goal: Goal, tdee: number, daily: number, weekly: number): string {
   if (goal === 'maintain') {
-    return `Your maintenance estimate is ${tdee} kcal. Eat around this to hold weight steady.`
+    return t(locale, 'goalNoteMaintain', { tdee })
   }
   const delta = Math.abs(tdee - daily)
   if (goal === 'lose') {
-    return `About ${delta} kcal/day below maintenance (~${weekly} kg/week). Minimum floors protect very low targets.`
+    return t(locale, 'goalNoteLose', { delta, weekly })
   }
-  return `About ${delta} kcal/day above maintenance (~${weekly} kg/week) to support a gradual gain.`
+  return t(locale, 'goalNoteGain', { delta, weekly })
 }

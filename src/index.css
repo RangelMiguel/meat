@@ -1650,6 +1650,134 @@ tbody tr:hover td {
   grid-template-columns: repeat(3, 1fr);
 }
 
+.goal-pace {
+  --pace-lose-fast: #4aa8d8;
+  --pace-lose: #3eb8a8;
+  --pace-maintain: #7b8fd4;
+  --pace-gain: #8f7ad6;
+  --pace-gain-fast: #5f6fd6;
+  --pace-now: var(--pace-maintain);
+  border: none;
+  margin: 0;
+  padding: 0;
+}
+
+.goal-pace[data-pace='lose_fast'] { --pace-now: var(--pace-lose-fast); }
+.goal-pace[data-pace='lose'] { --pace-now: var(--pace-lose); }
+.goal-pace[data-pace='maintain'] { --pace-now: var(--pace-maintain); }
+.goal-pace[data-pace='gain'] { --pace-now: var(--pace-gain); }
+.goal-pace[data-pace='gain_fast'] { --pace-now: var(--pace-gain-fast); }
+
+.goal-pace legend {
+  font-size: 0.74rem;
+  font-weight: 700;
+  margin-bottom: 0.55rem;
+  color: var(--text-muted);
+}
+
+.goal-pace-control {
+  display: block;
+}
+
+.goal-pace-control input[type='range'] {
+  width: 100%;
+  appearance: none;
+  height: 0.7rem;
+  margin: 0;
+  border-radius: 999px;
+  background: linear-gradient(
+    90deg,
+    var(--pace-lose-fast) 0%,
+    var(--pace-lose) 25%,
+    var(--pace-maintain) 50%,
+    var(--pace-gain) 75%,
+    var(--pace-gain-fast) 100%
+  );
+  outline: none;
+  cursor: pointer;
+}
+
+.goal-pace-control input[type='range']::-webkit-slider-thumb {
+  appearance: none;
+  width: 1.35rem;
+  height: 1.35rem;
+  border-radius: 50%;
+  background: var(--surface, #fff);
+  border: 3px solid var(--pace-now);
+  box-shadow: 0 2px 8px color-mix(in srgb, var(--pace-now) 45%, transparent);
+}
+
+.goal-pace-control input[type='range']::-moz-range-track {
+  height: 0.7rem;
+  border-radius: 999px;
+  background: linear-gradient(
+    90deg,
+    var(--pace-lose-fast) 0%,
+    var(--pace-lose) 25%,
+    var(--pace-maintain) 50%,
+    var(--pace-gain) 75%,
+    var(--pace-gain-fast) 100%
+  );
+}
+
+.goal-pace-control input[type='range']::-moz-range-thumb {
+  width: 1.35rem;
+  height: 1.35rem;
+  border-radius: 50%;
+  background: var(--surface, #fff);
+  border: 3px solid var(--pace-now);
+  box-shadow: 0 2px 8px color-mix(in srgb, var(--pace-now) 45%, transparent);
+}
+
+.goal-pace-ticks {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 0.25rem;
+  margin-top: 0.55rem;
+}
+
+.goal-pace-tick {
+  appearance: none;
+  border: none;
+  background: transparent;
+  color: var(--text-muted);
+  padding: 0.15rem 0.1rem;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.28rem;
+}
+
+.goal-pace-dot {
+  width: 0.45rem;
+  height: 0.45rem;
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--text-muted) 45%, transparent);
+}
+
+.goal-pace-tick[data-pace='lose_fast'] .goal-pace-dot { background: var(--pace-lose-fast); }
+.goal-pace-tick[data-pace='lose'] .goal-pace-dot { background: var(--pace-lose); }
+.goal-pace-tick[data-pace='maintain'] .goal-pace-dot { background: var(--pace-maintain); }
+.goal-pace-tick[data-pace='gain'] .goal-pace-dot { background: var(--pace-gain); }
+.goal-pace-tick[data-pace='gain_fast'] .goal-pace-dot { background: var(--pace-gain-fast); }
+
+.goal-pace-label {
+  font-size: 0.68rem;
+  font-weight: 650;
+  line-height: 1.2;
+  text-align: center;
+}
+
+.goal-pace-tick.is-active {
+  color: var(--pace-now);
+}
+
+.goal-pace-tick.is-active .goal-pace-dot {
+  transform: scale(1.25);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--pace-now) 22%, transparent);
+}
+
 .segment-btn {
   appearance: none;
   border: none;
