@@ -1,7 +1,8 @@
-import { useState, type FormEvent } from 'react'
+import { useEffect, useState, type FormEvent } from 'react'
 import { KeyRound } from 'lucide-react'
 import type { AppStore } from '../hooks/useAppStore'
 import { LOCALES, t } from '../i18n'
+import { inviteCodeFromLocation } from '../lib/inviteLink'
 
 interface Props {
   store: AppStore
@@ -14,6 +15,26 @@ export function AuthView({ store }: Props) {
   const [displayName, setDisplayName] = useState('')
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
+  const [inviteCode, setInviteCode] = useState<string | null>(null)
+  const [inviteName, setInviteName] = useState<string | null>(null)
+
+  useEffect(() => {
+    const code = inviteCodeFromLocation()
+    if (!code) return
+    setInviteCode(code)
+    void fetch(`/api/invite/peek?code=${encodeURIComponent(code)}`)
+      .then(async (res) => {
+        if (res.status === 404 || res.status === 400) {
+          setError(t(locale, 'badInvite'))
+          setInviteCode(null)
+          return
+        }
+        if (!res.ok) return
+        const data = (await res.json()) as { name?: string }
+        if (data.name) setInviteName(data.name)
+      })
+      .catch(() => undefined)
+  }, [locale])
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault()
@@ -21,10 +42,14 @@ export function AuthView({ store }: Props) {
     setError('')
     const result =
       mode === 'signup'
-        ? await store.signUp({ email, displayName })
-        : await store.logIn({ email })
+        ? await store.signUp({ email, displayName, inviteCode: inviteCode ?? undefined })
+        : await store.logIn({ email, inviteCode: inviteCode ?? undefined })
     setBusy(false)
     if (result) setError(t(locale, result))
+    else {
+      const { clearInviteFromLocation } = await import('../lib/inviteLink')
+      clearInviteFromLocation()
+    }
   }
 
   return (
@@ -44,7 +69,13 @@ export function AuthView({ store }: Props) {
       <div className="card-header">
         <div>
           <h2>{t(locale, 'authTitle')}</h2>
-          <p className="sub">{t(locale, 'authSub')}</p>
+          <p className="sub">
+            {inviteCode
+              ? inviteName
+                ? t(locale, 'joiningFamily', { name: inviteName })
+                : t(locale, 'joiningFamilyUnknown')
+              : t(locale, 'authSub')}
+          </p>
         </div>
       </div>
       <form

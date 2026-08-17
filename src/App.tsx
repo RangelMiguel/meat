@@ -23,6 +23,7 @@ import { PwaProvider } from './components/PwaProvider'
 import { assertCatalogIntegrity } from './data/catalog'
 import { useAppStore } from './hooks/useAppStore'
 import { t } from './i18n'
+import { clearInviteFromLocation, inviteCodeFromLocation } from './lib/inviteLink'
 import type { CookSession, View } from './types'
 
 export default function App() {
@@ -50,6 +51,19 @@ export default function App() {
     setView(hasPlan ? 'today' : 'plan')
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [store.isLoggedIn])
+
+  useEffect(() => {
+    if (!store.isLoggedIn) return
+    const code = inviteCodeFromLocation()
+    if (!code) return
+    if (store.family?.inviteCode === code) {
+      clearInviteFromLocation()
+      return
+    }
+    void store.joinFamily(code).then((err) => {
+      if (!err || err === 'alreadyInFamily') clearInviteFromLocation()
+    })
+  }, [store.isLoggedIn, store.family?.inviteCode, store.joinFamily])
 
   useEffect(() => {
     if (planMemberId && store.household.some((member) => member.id === planMemberId)) return

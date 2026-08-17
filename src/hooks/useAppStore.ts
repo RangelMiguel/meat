@@ -234,7 +234,11 @@ export function useAppStore() {
   }, [])
 
   const signUp = useCallback(
-    async (input: { email: string; displayName: string }): Promise<AuthError | null> => {
+    async (input: {
+      email: string
+      displayName: string
+      inviteCode?: string
+    }): Promise<AuthError | null> => {
       const email = input.email.trim().toLowerCase()
       const displayName = input.displayName.trim()
       if (!email) return 'emailRequired'
@@ -252,15 +256,20 @@ export function useAppStore() {
           return passkeyError
         }
         const local = loadState()
+        let workspace = next
         if (local.legacy) {
-          const imported = await api<WorkspaceDTO>('/api/workspace', {
+          workspace = await api<WorkspaceDTO>('/api/workspace', {
             method: 'POST',
             body: JSON.stringify({ action: 'importLegacy', ...local.legacy }),
           })
-          applyWorkspace(imported)
-        } else {
-          applyWorkspace(next)
         }
+        if (input.inviteCode) {
+          workspace = await api<WorkspaceDTO>('/api/workspace', {
+            method: 'POST',
+            body: JSON.stringify({ action: 'joinFamily', code: input.inviteCode }),
+          })
+        }
+        applyWorkspace(workspace)
         return null
       } catch (error) {
         return toAuthError(error)
@@ -270,7 +279,7 @@ export function useAppStore() {
   )
 
   const logIn = useCallback(
-    async (input: { email?: string }): Promise<AuthError | null> => {
+    async (input: { email?: string; inviteCode?: string }): Promise<AuthError | null> => {
       const { startAuthentication, browserSupportsWebAuthn } = await import(
         '@simplewebauthn/browser'
       )
@@ -282,10 +291,16 @@ export function useAppStore() {
           body: JSON.stringify(email ? { email } : {}),
         })
         const response = await startAuthentication({ optionsJSON: options as never })
-        const next = await api<WorkspaceDTO>('/api/auth/webauthn/login', {
+        let next = await api<WorkspaceDTO>('/api/auth/webauthn/login', {
           method: 'PUT',
           body: JSON.stringify({ response }),
         })
+        if (input.inviteCode && !next.family) {
+          next = await api<WorkspaceDTO>('/api/workspace', {
+            method: 'POST',
+            body: JSON.stringify({ action: 'joinFamily', code: input.inviteCode }),
+          })
+        }
         applyWorkspace(next)
         return null
       } catch (error) {

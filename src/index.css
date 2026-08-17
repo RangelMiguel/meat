@@ -2404,6 +2404,17 @@ tbody tr:hover td {
   font-size: 1.05rem;
 }
 
+.invite-link {
+  margin: 0.65rem 0 0;
+  font-size: 0.78rem;
+  color: var(--text-muted);
+  word-break: break-all;
+}
+
+.passkey-add {
+  margin-top: 1.1rem;
+}
+
 .eater-picker {
   margin-bottom: 0.85rem;
 }

@@ -1,7 +1,8 @@
 import { useState, type FormEvent } from 'react'
-import { Copy, Home, Plus, Trash2, Users } from 'lucide-react'
+import { Copy, Home, Link2, Plus, Trash2, Users } from 'lucide-react'
 import type { AppStore, AuthError } from '../hooks/useAppStore'
 import { t, type MsgId } from '../i18n'
+import { inviteLink } from '../lib/inviteLink'
 
 interface Props {
   store: AppStore
@@ -14,7 +15,7 @@ export function FamilyView({ store, onOpenMember }: Props) {
   const [invite, setInvite] = useState('')
   const [profileName, setProfileName] = useState('')
   const [error, setError] = useState('')
-  const [copied, setCopied] = useState(false)
+  const [copied, setCopied] = useState<'code' | 'link' | null>(null)
 
   const showError = (code: AuthError | null) => {
     if (!code) {
@@ -100,13 +101,15 @@ export function FamilyView({ store, onOpenMember }: Props) {
     )
   }
 
-  const copyCode = async () => {
+  const copyValue = async (kind: 'code' | 'link') => {
+    const value =
+      kind === 'link' ? inviteLink(store.family!.inviteCode) : store.family!.inviteCode
     try {
-      await navigator.clipboard.writeText(store.family!.inviteCode)
-      setCopied(true)
-      window.setTimeout(() => setCopied(false), 1600)
+      await navigator.clipboard.writeText(value)
+      setCopied(kind)
+      window.setTimeout(() => setCopied(null), 1800)
     } catch {
-      setCopied(false)
+      setCopied(null)
     }
   }
 
@@ -187,15 +190,20 @@ export function FamilyView({ store, onOpenMember }: Props) {
       <div className="card">
         <div className="card-header">
           <div>
-            <h4>{t(locale, 'inviteCode')}</h4>
+            <h4>{t(locale, 'inviteLink')}</h4>
             <p className="sub">{t(locale, 'inviteShare')}</p>
           </div>
           <strong className="invite-code">{store.family.inviteCode}</strong>
         </div>
+        <p className="invite-link">{inviteLink(store.family.inviteCode)}</p>
         <div className="btn-row">
-          <button type="button" className="btn btn-secondary" onClick={() => void copyCode()}>
+          <button type="button" className="btn btn-primary" onClick={() => void copyValue('link')}>
+            <Link2 size={16} />
+            {copied === 'link' ? t(locale, 'inviteLinkCopied') : t(locale, 'copyInviteLink')}
+          </button>
+          <button type="button" className="btn btn-secondary" onClick={() => void copyValue('code')}>
             <Copy size={16} />
-            {copied ? t(locale, 'copied') : t(locale, 'copyCode')}
+            {copied === 'code' ? t(locale, 'copied') : t(locale, 'copyCode')}
           </button>
           {store.isOwner && (
             <button type="button" className="btn btn-ghost" onClick={store.regenerateInviteCode}>

@@ -93,7 +93,12 @@ export function PasskeysCard({ store }: { store: AppStore }) {
           ))}
         </ul>
       )}
-      <button type="button" className="btn btn-secondary" disabled={busy} onClick={() => void add()}>
+      <button
+        type="button"
+        className="btn btn-secondary passkey-add"
+        disabled={busy}
+        onClick={() => void add()}
+      >
         <KeyRound size={16} />
         {t(locale, 'addPasskey')}
       </button>

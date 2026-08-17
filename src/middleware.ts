@@ -11,6 +11,7 @@ function isPublic(path: string) {
     return true
   }
   if (path.startsWith('/api/auth/webauthn/login')) return true
+  if (path.startsWith('/api/invite/peek')) return true
   if (path.startsWith('/_next') || path.startsWith('/favicon')) return true
   if (!path.startsWith('/api/')) return true
   return false
