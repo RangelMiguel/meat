@@ -306,17 +306,24 @@ function GoalPaceSlider({
       <legend>{t(locale, 'goal')}</legend>
       <label className="goal-pace-control" htmlFor="goal-pace">
         <span className="sr-only">{t(locale, 'goal')}</span>
-        <input
-          id="goal-pace"
-          type="range"
-          min={0}
-          max={GOAL_PACES.length - 1}
-          step={1}
-          value={index}
-          onChange={(e) => onChange(GOAL_PACES[Number(e.target.value)].id)}
-        />
+        <span className="goal-pace-track">
+          <span className="goal-pace-stops" aria-hidden>
+            {GOAL_PACES.map((pace) => (
+              <span key={pace.id} className="goal-pace-stop" data-pace={pace.id} />
+            ))}
+          </span>
+          <input
+            id="goal-pace"
+            type="range"
+            min={0}
+            max={GOAL_PACES.length - 1}
+            step={1}
+            value={index}
+            onChange={(e) => onChange(GOAL_PACES[Number(e.target.value)].id)}
+          />
+        </span>
       </label>
-      <div className="goal-pace-ticks" aria-hidden>
+      <div className="goal-pace-ticks">
         {GOAL_PACES.map((pace, i) => (
           <button
             key={pace.id}
@@ -325,7 +332,6 @@ function GoalPaceSlider({
             data-pace={pace.id}
             onClick={() => onChange(pace.id)}
           >
-            <span className="goal-pace-dot" />
             <span className="goal-pace-label">{t(locale, paceLabelKey(pace.id))}</span>
           </button>
         ))}

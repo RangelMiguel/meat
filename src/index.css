@@ -1651,6 +1651,7 @@ tbody tr:hover td {
 }
 
 .goal-pace {
+  --thumb: 1.35rem;
   --pace-lose-fast: #4aa8d8;
   --pace-lose: #3eb8a8;
   --pace-maintain: #7b8fd4;
@@ -1679,11 +1680,20 @@ tbody tr:hover td {
   display: block;
 }
 
-.goal-pace-control input[type='range'] {
-  width: 100%;
-  appearance: none;
+.goal-pace-track {
+  position: relative;
+  display: flex;
+  align-items: center;
+  height: var(--thumb);
+}
+
+.goal-pace-track::before {
+  content: '';
+  position: absolute;
+  inset-inline: 0;
+  top: 50%;
   height: 0.7rem;
-  margin: 0;
+  transform: translateY(-50%);
   border-radius: 999px;
   background: linear-gradient(
     90deg,
@@ -1693,14 +1703,52 @@ tbody tr:hover td {
     var(--pace-gain) 75%,
     var(--pace-gain-fast) 100%
   );
+}
+
+.goal-pace-stops {
+  position: absolute;
+  left: calc(var(--thumb) / 2);
+  right: calc(var(--thumb) / 2);
+  top: 50%;
+  z-index: 1;
+  display: flex;
+  justify-content: space-between;
+  height: 0.78rem;
+  transform: translateY(-50%);
+  pointer-events: none;
+}
+
+.goal-pace-stop {
+  width: 2px;
+  height: 100%;
+  border-radius: 1px;
+  background: rgba(255, 255, 255, 0.82);
+  box-shadow: 0 0 0 1px color-mix(in srgb, #0b1020 18%, transparent);
+}
+
+.goal-pace-control input[type='range'] {
+  position: relative;
+  z-index: 2;
+  width: 100%;
+  appearance: none;
+  height: 0.7rem;
+  margin: 0;
+  background: transparent;
   outline: none;
   cursor: pointer;
 }
 
+.goal-pace-control input[type='range']::-webkit-slider-runnable-track {
+  height: 0.7rem;
+  border-radius: 999px;
+  background: transparent;
+}
+
 .goal-pace-control input[type='range']::-webkit-slider-thumb {
   appearance: none;
-  width: 1.35rem;
-  height: 1.35rem;
+  width: var(--thumb);
+  height: var(--thumb);
+  margin-top: calc((0.7rem - var(--thumb)) / 2);
   border-radius: 50%;
   background: var(--surface, #fff);
   border: 3px solid var(--pace-now);
@@ -1710,19 +1758,12 @@ tbody tr:hover td {
 .goal-pace-control input[type='range']::-moz-range-track {
   height: 0.7rem;
   border-radius: 999px;
-  background: linear-gradient(
-    90deg,
-    var(--pace-lose-fast) 0%,
-    var(--pace-lose) 25%,
-    var(--pace-maintain) 50%,
-    var(--pace-gain) 75%,
-    var(--pace-gain-fast) 100%
-  );
+  background: transparent;
 }
 
 .goal-pace-control input[type='range']::-moz-range-thumb {
-  width: 1.35rem;
-  height: 1.35rem;
+  width: var(--thumb);
+  height: var(--thumb);
   border-radius: 50%;
   background: var(--surface, #fff);
   border: 3px solid var(--pace-now);
@@ -1730,10 +1771,10 @@ tbody tr:hover td {
 }
 
 .goal-pace-ticks {
-  display: grid;
-  grid-template-columns: repeat(5, minmax(0, 1fr));
-  gap: 0.25rem;
-  margin-top: 0.55rem;
+  display: flex;
+  justify-content: space-between;
+  padding: 0 calc(var(--thumb) / 2);
+  margin-top: 0.45rem;
 }
 
 .goal-pace-tick {
@@ -1741,41 +1782,25 @@ tbody tr:hover td {
   border: none;
   background: transparent;
   color: var(--text-muted);
-  padding: 0.15rem 0.1rem;
+  padding: 0;
+  width: 0;
+  flex: 0 0 0;
   cursor: pointer;
   display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 0.28rem;
+  justify-content: center;
 }
-
-.goal-pace-dot {
-  width: 0.45rem;
-  height: 0.45rem;
-  border-radius: 50%;
-  background: color-mix(in srgb, var(--text-muted) 45%, transparent);
-}
-
-.goal-pace-tick[data-pace='lose_fast'] .goal-pace-dot { background: var(--pace-lose-fast); }
-.goal-pace-tick[data-pace='lose'] .goal-pace-dot { background: var(--pace-lose); }
-.goal-pace-tick[data-pace='maintain'] .goal-pace-dot { background: var(--pace-maintain); }
-.goal-pace-tick[data-pace='gain'] .goal-pace-dot { background: var(--pace-gain); }
-.goal-pace-tick[data-pace='gain_fast'] .goal-pace-dot { background: var(--pace-gain-fast); }
 
 .goal-pace-label {
+  width: 4.6rem;
   font-size: 0.68rem;
   font-weight: 650;
   line-height: 1.2;
   text-align: center;
+  transform: translateX(0);
 }
 
 .goal-pace-tick.is-active {
   color: var(--pace-now);
-}
-
-.goal-pace-tick.is-active .goal-pace-dot {
-  transform: scale(1.25);
-  box-shadow: 0 0 0 3px color-mix(in srgb, var(--pace-now) 22%, transparent);
 }
 
 .segment-btn {
