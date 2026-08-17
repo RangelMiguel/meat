@@ -11,6 +11,7 @@ import { PurchaseView } from './components/PurchaseView'
 import { RecipesView } from './components/RecipesView'
 import { SettingsView } from './components/SettingsView'
 import { AiView } from './components/AiView'
+import { MarketplaceView } from './components/MarketplaceView'
 import { WeekPlanView } from './components/WeekPlanView'
 import { TodayView } from './components/TodayView'
 import { PwaProvider } from './components/PwaProvider'
@@ -63,6 +64,16 @@ export default function App() {
     if (planMemberId && store.household.some((member) => member.id === planMemberId)) return
     setPlanMemberId(store.myMember?.id ?? store.household[0]?.id ?? null)
   }, [store.household, store.myMember, planMemberId])
+
+  useEffect(() => {
+    if (!store.isLoggedIn) return
+    if (
+      (view === 'week' || view === 'exercise' || view === 'history' || view === 'ai') &&
+      !store.hasModule(view)
+    ) {
+      goTo('marketplace')
+    }
+  }, [view, store.installedModules, store.isLoggedIn, store.hasModule])
 
   const planMember =
     store.household.find((member) => member.id === planMemberId) ?? store.myMember ?? null
@@ -133,7 +144,7 @@ export default function App() {
                     existing={planMember.plan}
                     onSave={(plan) => {
                       store.savePlan(plan, planMember.id)
-                      goTo('week')
+                      goTo(store.hasModule('week') ? 'week' : 'today')
                     }}
                   />
                 )}
@@ -189,7 +200,14 @@ export default function App() {
                 }}
               />
             )}
-            {view === 'ai' && <AiView locale={locale} onGoSettings={() => goTo('settings')} />}
+            {view === 'marketplace' && <MarketplaceView store={store} />}
+            {view === 'ai' && (
+              <AiView
+                locale={locale}
+                onGoSettings={() => goTo('settings')}
+                onMutated={() => void store.reloadWorkspace()}
+              />
+            )}
           </>
         )}
         </>
@@ -217,6 +235,7 @@ export default function App() {
           onGo={goTo}
           onLocale={store.setLocale}
           onLogout={store.logOut}
+          installedModules={store.installedModules}
           footer={<span>{statusLine}</span>}
         >
           {screens}

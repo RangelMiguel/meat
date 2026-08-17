@@ -10,6 +10,9 @@ type PublicAi = {
   hasKey: boolean
   keyHint: string | null
   consented: boolean
+  usingFamilyKey: boolean
+  familyShared: boolean
+  canManageFamily: boolean
 }
 
 export function AiSettingsCard({ locale }: { locale: Locale }) {
@@ -19,6 +22,7 @@ export function AiSettingsCard({ locale }: { locale: Locale }) {
   const [model, setModel] = useState('grok-4.5')
   const [apiKey, setApiKey] = useState('')
   const [consent, setConsent] = useState(false)
+  const [shareWithFamily, setShareWithFamily] = useState(false)
   const [flash, setFlash] = useState<string | null>(null)
 
   useEffect(() => {
@@ -28,10 +32,12 @@ export function AiSettingsCard({ locale }: { locale: Locale }) {
       setBaseUrl(res.ai.baseUrl)
       setModel(res.ai.model)
       setConsent(res.ai.consented)
+      setShareWithFamily(res.ai.familyShared)
     })
   }, [])
 
   async function save() {
+    if (!ai) return
     const res = await api<{ ai: PublicAi }>('/api/ai/settings', {
       method: 'PATCH',
       body: JSON.stringify({
@@ -40,10 +46,12 @@ export function AiSettingsCard({ locale }: { locale: Locale }) {
         model,
         apiKey: apiKey.trim() || undefined,
         consent,
+        shareWithFamily: ai.canManageFamily ? shareWithFamily : undefined,
       }),
     })
     setAi(res.ai)
     setApiKey('')
+    setShareWithFamily(res.ai.familyShared)
     setFlash(t(locale, 'aiSaved'))
   }
 
@@ -120,6 +128,27 @@ export function AiSettingsCard({ locale }: { locale: Locale }) {
             </button>
           )}
         </div>
+        {ai.usingFamilyKey && <p className="field-hint">{t(locale, 'aiUsingFamilyKey')}</p>}
+        {ai.canManageFamily && (
+          <label className="field" style={{ display: 'flex', alignItems: 'flex-start', gap: '0.55rem' }}>
+            <input
+              type="checkbox"
+              checked={shareWithFamily}
+              onChange={(e) => setShareWithFamily(e.target.checked)}
+            />
+            <span>
+              <strong>{t(locale, 'aiShareFamily')}</strong>
+              <span className="field-hint" style={{ display: 'block' }}>
+                {t(locale, 'aiShareFamilyHint')}
+              </span>
+              {shareWithFamily && (
+                <span className="field-hint" style={{ display: 'block' }}>
+                  {t(locale, 'aiFamilySharedOn')}
+                </span>
+              )}
+            </span>
+          </label>
+        )}
         <label className="field" style={{ display: 'flex', alignItems: 'flex-start', gap: '0.55rem' }}>
           <input type="checkbox" checked={consent} onChange={(e) => setConsent(e.target.checked)} />
           <span>

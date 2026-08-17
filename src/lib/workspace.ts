@@ -40,6 +40,7 @@ import type {
 import type { Locale } from '../i18n'
 import { normalizeThemeId, type ThemeId } from '../themes'
 import type { WorkspaceDTO } from './workspace-types'
+import { listInstalledModuleIds, requireAddon } from './modules/access'
 
 export type { WorkspaceDTO } from './workspace-types'
 
@@ -236,6 +237,8 @@ export function serializeWorkspace(
     theme: parseTheme(pref?.theme),
     locale: parseLocale(pref?.locale || user.locale),
     finance: publicFinanceLink(parseFinanceLink(safeJson(kitchen.integrationsJson))),
+    role: household.memberships.find((item) => item.userId === user.id)?.role ?? 'member',
+    installedModules: [],
   }
 }
 
@@ -249,7 +252,8 @@ export async function loadWorkspace(userId: string): Promise<WorkspaceDTO> {
   const user = await prisma.user.findUnique({ where: { id: userId } })
   if (!user) throw new BadRequestError('badLogin')
   const pref = await prisma.userPreference.findUnique({ where: { userId } })
-  return serializeWorkspace(household, user, pref)
+  const installedModules = await listInstalledModuleIds(household.id)
+  return { ...serializeWorkspace(household, user, pref), installedModules }
 }
 
 async function loadHousehold(householdId: string) {
@@ -528,6 +532,11 @@ export async function mutateWorkspace(userId: string, raw: unknown): Promise<Wor
   let household = await loadHousehold(access.householdId)
   const mine = memberOfUser(household, userId)
   if (!mine) throw new BadRequestError('badLogin')
+
+  if (body.action === 'saveWeekPlan') await requireAddon(household.id, 'week')
+  if (body.action === 'addExercise' || body.action === 'removeExercise') {
+    await requireAddon(household.id, 'exercise')
+  }
 
   switch (body.action) {
     case 'createFamily': {

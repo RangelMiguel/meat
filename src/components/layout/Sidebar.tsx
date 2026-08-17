@@ -11,6 +11,7 @@ import {
   Settings,
   ShoppingCart,
   Sparkles,
+  Store,
 } from 'lucide-react'
 import { LOCALES, t, type Locale } from '../../i18n'
 import type { View } from '../../types'
@@ -19,6 +20,7 @@ type NavItem = {
   id: View
   label: string
   icon: LucideIcon
+  addon?: boolean
 }
 
 interface Props {
@@ -31,6 +33,7 @@ interface Props {
   onLocale: (locale: Locale) => void
   onLogout: () => void
   onNavigate?: () => void
+  installedModules?: string[]
 }
 
 export function Sidebar({
@@ -43,6 +46,7 @@ export function Sidebar({
   onLocale,
   onLogout,
   onNavigate,
+  installedModules = [],
 }: Props) {
   const go = (next: View) => {
     onGo(next)
@@ -52,15 +56,17 @@ export function Sidebar({
   const items: NavItem[] = [
     { id: 'today', label: t(locale, 'navToday'), icon: Flame },
     { id: 'plan', label: t(locale, 'navPlan'), icon: ClipboardList },
-    { id: 'week', label: t(locale, 'navWeek'), icon: CalendarRange },
+    { id: 'week', label: t(locale, 'navWeek'), icon: CalendarRange, addon: true },
     { id: 'recipes', label: t(locale, 'navRecipes'), icon: BookOpen },
     { id: 'inventory', label: t(locale, 'navInventory'), icon: Package },
     { id: 'purchase', label: t(locale, 'navPurchase'), icon: ShoppingCart },
-    { id: 'exercise', label: t(locale, 'navExercise'), icon: Dumbbell },
-    { id: 'history', label: t(locale, 'navHistory'), icon: CalendarDays },
+    { id: 'exercise', label: t(locale, 'navExercise'), icon: Dumbbell, addon: true },
+    { id: 'history', label: t(locale, 'navHistory'), icon: CalendarDays, addon: true },
+    { id: 'marketplace', label: t(locale, 'navMarketplace'), icon: Store },
     { id: 'settings', label: t(locale, 'navSettings'), icon: Settings },
-    { id: 'ai', label: t(locale, 'navAi'), icon: Sparkles },
+    { id: 'ai', label: t(locale, 'navAi'), icon: Sparkles, addon: true },
   ]
+  const visible = items.filter((item) => !item.addon || installedModules.includes(item.id))
 
   return (
     <aside className="sidebar-shell" aria-label={t(locale, 'navMain')}>
@@ -78,7 +84,7 @@ export function Sidebar({
       </div>
 
       <nav className="sidebar-nav" aria-label={t(locale, 'navMain')}>
-        {items.map((item) => {
+        {visible.map((item) => {
           const Icon = item.icon
           const active = view === item.id && !cooking
           return (

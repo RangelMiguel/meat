@@ -261,9 +261,11 @@ export function TodayView({
             <button className="btn btn-secondary" type="button" onClick={onGoPlan}>
               {t(locale, 'editPlan')}
             </button>
-            <button className="btn btn-secondary" type="button" onClick={() => setLogMode('exercise')}>
-              <Dumbbell size={16} /> {t(locale, 'logWorkout')}
-            </button>
+            {store.hasModule('exercise') && (
+              <button className="btn btn-secondary" type="button" onClick={() => setLogMode('exercise')}>
+                <Dumbbell size={16} /> {t(locale, 'logWorkout')}
+              </button>
+            )}
           </div>
         </div>
       </section>

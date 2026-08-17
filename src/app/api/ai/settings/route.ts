@@ -23,6 +23,7 @@ export async function PATCH(req: Request) {
         apiKey: z.string().max(400).optional(),
         clearKey: z.boolean().optional(),
         consent: z.boolean().optional(),
+        shareWithFamily: z.boolean().optional(),
       })
       .parse(await req.json())
     return jsonOk({ ai: await saveAiSettings(session.userId, body) })

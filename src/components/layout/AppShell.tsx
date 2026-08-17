@@ -14,6 +14,7 @@ interface Props {
   onGo: (view: View) => void
   onLocale: (locale: Locale) => void
   onLogout: () => void
+  installedModules?: string[]
   children: ReactNode
 }
 
@@ -27,6 +28,7 @@ export function AppShell({
   onGo,
   onLocale,
   onLogout,
+  installedModules,
   children,
 }: Props) {
   const [open, setOpen] = useState(false)
@@ -47,6 +49,7 @@ export function AppShell({
           onGo={onGo}
           onLocale={onLocale}
           onLogout={onLogout}
+          installedModules={installedModules}
         />
       </div>
 
@@ -69,6 +72,7 @@ export function AppShell({
               onLocale={onLocale}
               onLogout={onLogout}
               onNavigate={() => setOpen(false)}
+              installedModules={installedModules}
             />
           </div>
         </div>

@@ -1,7 +1,10 @@
-import { useState, type FormEvent } from 'react'
-import { Plus } from 'lucide-react'
+import { useCallback, useState, type FormEvent } from 'react'
+import { Plus, ScanBarcode } from 'lucide-react'
+import { api, ApiError } from '../lib/api'
 import { mealLabel, t, type Locale } from '../i18n'
 import { MEAL_ORDER, type MealType } from '../types'
+import { BarcodeScanner } from './BarcodeScanner'
+import type { NutritionHit } from '../lib/nutrition/types'
 
 export interface LogFoodPayload {
   meal: MealType
@@ -47,11 +50,54 @@ export function LogFoodForm({
     ...initial,
   })
   const [error, setError] = useState('')
+  const [scanning, setScanning] = useState(false)
+  const [looking, setLooking] = useState(false)
+  const [sourceHint, setSourceHint] = useState('')
 
   const update = <K extends keyof LogFoodPayload>(key: K, value: LogFoodPayload[K]) => {
     setForm((f) => ({ ...f, [key]: value }))
     setError('')
   }
+
+  const lookupBarcode = useCallback(
+    async (barcode: string) => {
+      setScanning(false)
+      setLooking(true)
+      setError('')
+      try {
+        const res = await api<{ hit: NutritionHit | null; error?: string }>('/api/nutrition/lookup', {
+          method: 'POST',
+          body: JSON.stringify({ barcode }),
+        })
+        if (!res.hit) {
+          setError(t(locale, 'barcodeNotFound'))
+          return
+        }
+        const hit = res.hit
+        const macros = hit.pack && hit.pack.kcal > 0 && !hit.servingLabel ? hit.pack : hit.serving
+        const note = hit.servingLabel || hit.pack?.label || hit.quantity
+        setForm((f) => ({
+          ...f,
+          name: hit.brand ? `${hit.brand} ${hit.name}` : hit.name,
+          detail: note || f.detail,
+          kcal: macros.kcal,
+          protein: macros.protein,
+          carbs: macros.carbs,
+          fat: macros.fat,
+        }))
+        setSourceHint(
+          hit.estimated || hit.source === 'ai'
+            ? t(locale, 'barcodeAiEstimate')
+            : t(locale, 'barcodeFromDb'),
+        )
+      } catch (e) {
+        setError(e instanceof ApiError ? e.code : t(locale, 'barcodeNotFound'))
+      } finally {
+        setLooking(false)
+      }
+    },
+    [locale],
+  )
 
   const handleSubmit = (e: FormEvent) => {
     e.preventDefault()
@@ -84,15 +130,29 @@ export function LogFoodForm({
           </div>
         </div>
       )}
+      {scanning && (
+        <BarcodeScanner locale={locale} onDetect={(code) => void lookupBarcode(code)} onClose={() => setScanning(false)} />
+      )}
       <div className="field">
         <label htmlFor="food-name">{t(locale, 'food')}</label>
-        <input
-          id="food-name"
-          value={form.name}
-          onChange={(e) => update('name', e.target.value)}
-          placeholder={t(locale, 'foodPlaceholder')}
-          autoFocus
-        />
+        <div className="barcode-name-row">
+          <input
+            id="food-name"
+            value={form.name}
+            onChange={(e) => update('name', e.target.value)}
+            placeholder={t(locale, 'foodPlaceholder')}
+            autoFocus
+          />
+          <button
+            type="button"
+            className="btn btn-secondary"
+            onClick={() => setScanning(true)}
+            disabled={looking}
+          >
+            <ScanBarcode size={16} /> {looking ? t(locale, 'barcodeLooking') : t(locale, 'scanBarcode')}
+          </button>
+        </div>
+        {sourceHint && <p className="field-hint">{sourceHint}</p>}
       </div>
       <div className="form-row">
         <div className="field">

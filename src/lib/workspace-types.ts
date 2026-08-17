@@ -12,4 +12,6 @@ export type WorkspaceDTO = {
   theme: ThemeId
   locale: Locale
   finance: FinanceLinkPublic
+  role: string
+  installedModules: string[]
 }

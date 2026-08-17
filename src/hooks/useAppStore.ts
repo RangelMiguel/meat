@@ -12,6 +12,7 @@ import { loadState, saveState } from '../lib/storage'
 import type { Locale } from '../i18n'
 import { defaultTheme, type ThemeId } from '../themes'
 import type { WorkspaceDTO } from '../lib/workspace-types'
+import { isAddonModule } from '../lib/modules/catalog'
 import type {
   Account,
   CaloriePlan,
@@ -124,6 +125,12 @@ export function useAppStore() {
     },
     [applyWorkspace],
   )
+
+  const reloadWorkspace = useCallback(async () => {
+    const next = await api<WorkspaceDTO>('/api/workspace')
+    applyWorkspace(next)
+    return next
+  }, [applyWorkspace])
 
   useEffect(() => {
     let cancelled = false
@@ -722,6 +729,11 @@ export function useAppStore() {
     householdGoal,
     householdMacros,
     isOwner,
+    role: workspace?.role ?? 'member',
+    installedModules: workspace?.installedModules ?? [],
+    canManageModules: workspace?.role === 'owner' || workspace?.role === 'admin',
+    hasModule: (id: string) =>
+      !isAddonModule(id) || (workspace?.installedModules ?? []).includes(id),
     isLoggedIn: status === 'ready' && Boolean(account),
     plan,
     entries,
@@ -787,6 +799,7 @@ export function useAppStore() {
     saveRecipe,
     deleteRecipe,
     resetRecipe,
+    reloadWorkspace,
   }
 }
 

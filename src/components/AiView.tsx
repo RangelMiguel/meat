@@ -3,7 +3,8 @@ import { Sparkles } from 'lucide-react'
 import { api, ApiError } from '../lib/api'
 import { t, type Locale } from '../i18n'
 
-type Msg = { role: 'user' | 'assistant'; content: string }
+type Action = { name: string; summary: string }
+type Msg = { role: 'user' | 'assistant'; content: string; actions?: Action[] }
 
 type PublicAi = {
   consented: boolean
@@ -15,9 +16,10 @@ type PublicAi = {
 interface Props {
   locale: Locale
   onGoSettings: () => void
+  onMutated?: () => void
 }
 
-export function AiView({ locale, onGoSettings }: Props) {
+export function AiView({ locale, onGoSettings, onMutated }: Props) {
   const [ready, setReady] = useState<{ consented: boolean; configured: boolean } | null>(null)
   const [consent, setConsent] = useState(false)
   const [messages, setMessages] = useState<Msg[]>([])
@@ -58,11 +60,15 @@ export function AiView({ locale, onGoSettings }: Props) {
     setBusy(true)
     setError(null)
     try {
-      const res = await api<{ reply: string }>('/api/ai/ask', {
+      const res = await api<{ reply: string; actions?: Action[] }>('/api/ai/ask', {
         method: 'POST',
         body: JSON.stringify({ messages: next }),
       })
-      setMessages([...next, { role: 'assistant', content: res.reply }])
+      setMessages([
+        ...next,
+        { role: 'assistant', content: res.reply, actions: res.actions ?? [] },
+      ])
+      if (res.actions?.length) onMutated?.()
     } catch (e) {
       setError(e instanceof ApiError ? e.code : t(locale, 'aiNeedKey'))
     } finally {
@@ -126,6 +132,13 @@ export function AiView({ locale, onGoSettings }: Props) {
                   )}
                 </strong>
                 <p>{msg.content}</p>
+                {msg.actions && msg.actions.length > 0 && (
+                  <ul className="ai-actions">
+                    {msg.actions.map((action, j) => (
+                      <li key={`${action.name}-${j}`}>{action.summary}</li>
+                    ))}
+                  </ul>
+                )}
               </div>
             ))}
             {busy && <p className="field-hint">{t(locale, 'aiThinking')}</p>}
