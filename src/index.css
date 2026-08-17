@@ -876,6 +876,14 @@ button.inventory-accordion.is-open {
   flex-shrink: 0;
 }
 
+.food-kcal-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.1rem;
+  margin-top: 0.15rem;
+}
+
 .food-kcal strong {
   display: block;
   font-family: var(--font-mono);
@@ -1702,6 +1710,12 @@ tbody tr:hover td {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.history-kcal-cell {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.2rem;
 }
 
 .footer {

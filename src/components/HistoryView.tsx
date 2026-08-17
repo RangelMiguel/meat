@@ -1,6 +1,8 @@
 import type { AppStore } from '../hooks/useAppStore'
 import { exerciseLabel, mealLabel, recipeName, t } from '../i18n'
 import { formatDateLabel } from '../lib/calories'
+import { checkInputFromEntry } from '../lib/geminiCheck'
+import { GeminiCheckButton } from './GeminiCheckButton'
 
 interface Props {
   store: AppStore
@@ -111,7 +113,17 @@ export function HistoryView({ store }: Props) {
                         : e.name}
                       {household.length > 1 ? ` · ${e.memberName}` : ''}
                     </span>
-                    <span className="mono">{e.kcal}</span>
+                    <span className="history-kcal-cell mono">
+                      <GeminiCheckButton
+                        locale={locale}
+                        compact
+                        item={checkInputFromEntry(
+                          e,
+                          e.recipeId ? store.recipeById(e.recipeId) : null,
+                        )}
+                      />
+                      {e.kcal}
+                    </span>
                   </li>
                 ))}
                 {dayWorkouts.map((item) => (

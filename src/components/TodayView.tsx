@@ -11,6 +11,8 @@ import { MEAL_ORDER, type CookSession, type MealType } from '../types'
 import { CalorieRing } from './CalorieRing'
 import { ExerciseFuelCard } from './ExerciseFuelCard'
 import { EaterPicker } from './EaterPicker'
+import { GeminiCheckButton } from './GeminiCheckButton'
+import { checkInputFromEntry } from '../lib/geminiCheck'
 import { exerciseLabel, mealLabel, recipeName, t } from '../i18n'
 
 interface Props {
@@ -571,14 +573,24 @@ export function TodayView({
                     </div>
                     <div className="food-kcal">
                       <strong>{item.kcal}</strong>
-                      <button
-                        type="button"
-                        className="btn btn-ghost btn-sm icon-danger"
-                        aria-label={t(locale, 'removeFood', { name: item.name })}
-                        onClick={() => store.removeEntry(item.id)}
-                      >
-                        <Trash2 size={14} />
-                      </button>
+                      <div className="food-kcal-actions">
+                        <GeminiCheckButton
+                          locale={locale}
+                          compact
+                          item={checkInputFromEntry(
+                            item,
+                            item.recipeId ? store.recipeById(item.recipeId) : null,
+                          )}
+                        />
+                        <button
+                          type="button"
+                          className="btn btn-ghost btn-sm icon-danger"
+                          aria-label={t(locale, 'removeFood', { name: item.name })}
+                          onClick={() => store.removeEntry(item.id)}
+                        >
+                          <Trash2 size={14} />
+                        </button>
+                      </div>
                     </div>
                   </div>
                 ))
