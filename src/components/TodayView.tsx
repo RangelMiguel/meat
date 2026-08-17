@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { ChefHat, Droplets, Dumbbell, Plus, Trash2, Utensils } from 'lucide-react'
-import { QUICK_FOODS } from '../lib/foods'
+import { QUICK_FOODS, QUICK_FOOD_GROUPS, type QuickFoodGroup } from '../lib/foods'
 import { eatBackShare, mergeFuel, suggestFuel } from '../lib/exercises'
 import { formatServings } from '../lib/portions'
 import type { AppStore } from '../hooks/useAppStore'
@@ -48,6 +48,8 @@ export function TodayView({
   const [logMode, setLogMode] = useState<LogMode>(() => (prepareRecipeId ? 'recipe' : 'closed'))
   const [defaultMeal, setDefaultMeal] = useState<MealType>('Lunch')
   const [eaterIds, setEaterIds] = useState<string[]>(() => household.map((member) => member.id))
+  const [quickGroup, setQuickGroup] = useState<QuickFoodGroup | 'all'>('all')
+  const [quickQuery, setQuickQuery] = useState('')
 
   useEffect(() => {
     setEaterIds((ids) => {
@@ -472,33 +474,72 @@ export function TodayView({
           selected={eaterIds}
           onChange={setEaterIds}
         />
-        <div className="quick-adds">
-          {QUICK_FOODS.map((food) => {
+        <div className="theme-pills" role="tablist" aria-label={t(locale, 'quickAddTitle')}>
+          {QUICK_FOOD_GROUPS.map((group) => {
+            const label = locale === 'es' ? group.labelEs : group.label
+            return (
+              <button
+                key={group.id}
+                type="button"
+                role="tab"
+                aria-selected={quickGroup === group.id}
+                className={`theme-pill${quickGroup === group.id ? ' is-active' : ''}`}
+                onClick={() => setQuickGroup(group.id)}
+              >
+                {label}
+              </button>
+            )
+          })}
+        </div>
+        <div className="field" style={{ marginTop: '0.65rem' }}>
+          <label className="sr-only" htmlFor="quick-search">
+            {t(locale, 'quickSearch')}
+          </label>
+          <input
+            id="quick-search"
+            value={quickQuery}
+            onChange={(e) => setQuickQuery(e.target.value)}
+            placeholder={t(locale, 'quickSearch')}
+          />
+        </div>
+        <div className="quick-adds" style={{ marginTop: '0.65rem' }}>
+          {QUICK_FOODS.filter((food) => {
+            if (quickGroup !== 'all' && food.group !== quickGroup) return false
+            const q = quickQuery.trim().toLowerCase()
+            if (!q) return true
+            return (
+              food.name.toLowerCase().includes(q) ||
+              food.nameEs.toLowerCase().includes(q) ||
+              food.detail.toLowerCase().includes(q) ||
+              food.detailEs.toLowerCase().includes(q)
+            )
+          }).map((food) => {
             const label = locale === 'es' ? food.nameEs : food.name
             const detail = locale === 'es' ? food.detailEs : food.detail
             return (
-            <button
-              key={food.name}
-              type="button"
-              className="quick-add"
-              onClick={() =>
-                store.addEntry(
-                  {
-                    meal: 'Snack',
-                    name: label,
-                    detail,
-                    kcal: food.kcal,
-                    protein: food.protein,
-                    carbs: food.carbs,
-                    fat: food.fat,
-                  },
-                  eaterIds,
-                )
-              }
-            >
-              {label}
-              <em>{food.kcal}</em>
-            </button>
+              <button
+                key={food.id}
+                type="button"
+                className="quick-add"
+                title={detail}
+                onClick={() =>
+                  store.addEntry(
+                    {
+                      meal: 'Snack',
+                      name: label,
+                      detail,
+                      kcal: food.kcal,
+                      protein: food.protein,
+                      carbs: food.carbs,
+                      fat: food.fat,
+                    },
+                    eaterIds,
+                  )
+                }
+              >
+                {label}
+                <em>{food.kcal}</em>
+              </button>
             )
           })}
         </div>

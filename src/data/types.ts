@@ -23,6 +23,7 @@ export type IngredientCategory =
   | 'oil-fat'
   | 'nut-seed'
   | 'sweetener'
+  | 'beverage'
   | 'other'
 
 export interface Ingredient {
