@@ -106,12 +106,20 @@ export async function verifyRegistration(
   })
   if (!pending) throw new BadRequestError('passkeyExpired')
 
-  const verification = await verifyRegistrationResponse({
-    response: body,
-    expectedChallenge: pending.challenge,
-    expectedOrigin: origin,
-    expectedRPID: rpID,
-  })
+  let verification
+  try {
+    verification = await verifyRegistrationResponse({
+      response: body,
+      expectedChallenge: pending.challenge,
+      expectedOrigin: origin,
+      expectedRPID: rpID,
+      // Match userVerification: "preferred" — many phones/desktops create a
+      // passkey without a PIN/biometric, and the library defaults to requiring UV.
+      requireUserVerification: false,
+    })
+  } catch {
+    throw new BadRequestError('passkeyFailed')
+  }
 
   await prisma.webAuthnChallenge.delete({ where: { id: pending.id } }).catch(() => {})
 
@@ -198,6 +206,7 @@ export async function verifyAuthentication(req: Request, body: AuthenticationRes
         expectedChallenge: c.challenge,
         expectedOrigin: origin,
         expectedRPID: rpID,
+        requireUserVerification: false,
         credential: {
           id: cred.credentialId,
           publicKey: new Uint8Array(cred.publicKey),

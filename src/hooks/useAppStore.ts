@@ -66,7 +66,9 @@ const AUTH_CODES = new Set<AuthError>([
 
 function toAuthError(error: unknown): AuthError {
   const code = error instanceof ApiError ? error.code : error instanceof Error ? error.message : ''
-  return AUTH_CODES.has(code as AuthError) ? (code as AuthError) : 'networkError'
+  if (AUTH_CODES.has(code as AuthError)) return code as AuthError
+  if (/user verification/i.test(code)) return 'passkeyFailed'
+  return 'networkError'
 }
 
 function memberForAccount(members: Member[], accountId: string): Member | undefined {
