@@ -65,14 +65,14 @@ export function SettingsView({ store, onOpenMember }: Props) {
                 aria-selected={store.theme === theme.id}
                 className={`theme-pill${store.theme === theme.id ? ' is-active' : ''}`}
                 onClick={() => store.setTheme(theme.id)}
-                title={theme.tagline}
+                title={locale === 'es' ? theme.tagline.es : theme.tagline.en}
               >
                 <span
                   className="theme-pill-dot"
                   style={{ background: theme.preview.primary }}
                   aria-hidden
                 />
-                {theme.name}
+                {locale === 'es' ? theme.name.es : theme.name.en}
               </button>
             ))}
           </div>
@@ -173,7 +173,7 @@ export function SettingsView({ store, onOpenMember }: Props) {
                 }
                 setFinanceFlash(
                   result.lastStatus === 'ok'
-                    ? t(locale, 'financeTestOk', { name: 'MisFinanzas' })
+                    ? t(locale, 'financeTestOk', { name: 'Finance' })
                     : t(locale, 'financeTestFail', { error: result.lastError || '' }),
                 )
               }}

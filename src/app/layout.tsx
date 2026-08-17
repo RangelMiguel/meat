@@ -22,14 +22,14 @@ export const metadata: Metadata = {
 }
 
 export const viewport: Viewport = {
-  themeColor: '#3f7a5a',
+  themeColor: '#2dd4bf',
   width: 'device-width',
   initialScale: 1,
 }
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en" data-theme="grove">
+    <html lang="en" data-theme="midnight">
       <body>{children}</body>
     </html>
   )

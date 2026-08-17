@@ -1,6 +1,6 @@
 import { defaultLocale, type Locale } from '../i18n'
 import { clampGrams } from './calories'
-import { defaultTheme, themes, type ThemeId } from '../themes'
+import { defaultTheme, normalizeThemeId, type ThemeId } from '../themes'
 import { parseCustomRecipes, parseRecipeOverrides } from './recipeLibrary'
 import { emptyWeekPlan, parseWeekPlan } from './weekPlan'
 import type {
@@ -269,15 +269,11 @@ export function loadState(): AppState {
     const parsed = v2 ?? v1
     if (!parsed) {
       const oldTheme = localStorage.getItem('meat-theme') as ThemeId | null
-      const theme =
-        oldTheme && themes.some((item) => item.id === oldTheme) ? oldTheme : defaultTheme
+      const theme = normalizeThemeId(oldTheme)
       return { ...emptyState(), theme }
     }
 
-    const theme =
-      typeof parsed.theme === 'string' && themes.some((item) => item.id === parsed.theme)
-        ? (parsed.theme as ThemeId)
-        : defaultTheme
+    const theme = normalizeThemeId(parsed.theme)
     const locale: Locale =
       parsed.locale === 'es' || parsed.locale === 'en' ? parsed.locale : defaultLocale()
 

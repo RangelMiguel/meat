@@ -38,7 +38,7 @@ import type {
   WeekMealSlot,
 } from '../types'
 import type { Locale } from '../i18n'
-import { defaultTheme, themes, type ThemeId } from '../themes'
+import { normalizeThemeId, type ThemeId } from '../themes'
 import type { WorkspaceDTO } from './workspace-types'
 
 export type { WorkspaceDTO } from './workspace-types'
@@ -78,7 +78,7 @@ const EXERCISE_KINDS: ExerciseKind[] = [
 ]
 
 function parseTheme(value: string | null | undefined): ThemeId {
-  return themes.some((item) => item.id === value) ? (value as ThemeId) : defaultTheme
+  return normalizeThemeId(value)
 }
 
 function parseLocale(value: string | null | undefined): Locale {

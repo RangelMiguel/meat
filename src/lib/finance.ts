@@ -148,7 +148,7 @@ export async function testMeatConnection(opts: {
     }
     return {
       ok: true,
-      householdName: data.householdName || 'MisFinanzas',
+      householdName: data.householdName || 'Finance',
       currency: data.currency || '',
     }
   } catch (error) {
