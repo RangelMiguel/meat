@@ -6,6 +6,7 @@ import { themes } from '../themes'
 import { FamilyView } from './FamilyView'
 import { PasskeysCard } from './PasskeysCard'
 import { PwaInstallCard } from './PwaInstallCard'
+import { AiSettingsCard } from './AiSettingsCard'
 
 interface Props {
   store: AppStore
@@ -93,6 +94,8 @@ export function SettingsView({ store, onOpenMember }: Props) {
           </button>
         </div>
       </div>
+
+      <AiSettingsCard locale={locale} />
 
       <div className="card">
         <div className="card-header">

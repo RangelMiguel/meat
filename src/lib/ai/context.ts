@@ -1,0 +1,102 @@
+import { getIngredient } from '../../data/catalog'
+import { todayKey } from '../calories'
+import { prisma } from '../db'
+import { mondayOf, parseWeekPlan, upcomingSlots } from '../weekPlan'
+import type { CaloriePlan } from '../../types'
+
+function parsePlan(raw: string | null): CaloriePlan | null {
+  if (!raw) return null
+  try {
+    const plan = JSON.parse(raw) as CaloriePlan
+    return plan && typeof plan === 'object' && plan.dailyCalories ? plan : null
+  } catch {
+    return null
+  }
+}
+
+function clip(text: string, max = 12_000): string {
+  if (text.length <= max) return text
+  return `${text.slice(0, max)}\n…[truncated]`
+}
+
+export async function buildMeatContext(userId: string): Promise<string> {
+  const member = await prisma.member.findFirst({
+    where: { userId },
+    include: {
+      household: { include: { kitchen: { include: { inventory: true, purchases: true } } } },
+      entries: { orderBy: { createdAt: 'desc' }, take: 40 },
+      exercises: { orderBy: { createdAt: 'desc' }, take: 15 },
+    },
+  })
+  if (!member) return 'No member profile found.'
+
+  const today = todayKey()
+  const plan = parsePlan(member.planJson)
+  const lines: string[] = [
+    'App: meat (meals, calories, kitchen)',
+    `Person: ${member.name}`,
+    `Today: ${today}`,
+  ]
+  if (plan) {
+    lines.push(
+      `Plan: ${plan.dailyCalories} kcal/day · P${plan.macros.proteinG} C${plan.macros.carbsG} F${plan.macros.fatG} · goal ${plan.input.goal}`,
+    )
+  }
+
+  const todayFood = member.entries.filter((e) => e.date === today)
+  const todayKcal = todayFood.reduce((s, e) => s + e.kcal, 0)
+  lines.push(`Today eaten: ${Math.round(todayKcal)} kcal, ${todayFood.length} items`)
+  for (const e of todayFood.slice(0, 12)) {
+    lines.push(`- ${e.meal} ${e.name}: ${Math.round(e.kcal)} kcal`)
+  }
+
+  lines.push('Recent food log:')
+  for (const e of member.entries.slice(0, 20)) {
+    lines.push(`- ${e.date} ${e.meal} ${e.name}: ${Math.round(e.kcal)} kcal P${e.protein} C${e.carbs} F${e.fat}`)
+  }
+
+  const todayEx = member.exercises.filter((e) => e.date === today)
+  if (todayEx.length) {
+    const burned = todayEx.reduce((s, e) => s + e.kcal, 0)
+    lines.push(`Today exercise: ${burned} kcal burned`)
+  }
+
+  const kitchen = member.household.kitchen
+  if (kitchen) {
+    const week = parseWeekPlan(safeJson(kitchen.weekPlanJson))
+    const upcoming = upcomingSlots(week.slots, mondayOf(today), today)
+    if (upcoming.length) {
+      lines.push('Upcoming week meals:')
+      for (const slot of upcoming.slice(0, 20)) {
+        lines.push(`- ${slot.date} ${slot.meal}: recipe ${slot.recipeId} × ${slot.servings}`)
+      }
+    }
+    if (kitchen.inventory.length) {
+      lines.push('Inventory (on hand):')
+      for (const lot of kitchen.inventory.slice(0, 25)) {
+        const name = getIngredient(lot.ingredientId)?.name ?? lot.ingredientId
+        lines.push(`- ${name}: ${lot.grams} (${lot.boughtOn})`)
+      }
+    }
+    if (kitchen.purchases.length) {
+      lines.push('Purchase list:')
+      for (const item of kitchen.purchases.slice(0, 20)) {
+        const name = getIngredient(item.ingredientId)?.name ?? item.ingredientId
+        lines.push(`- ${name}: ${item.grams}`)
+      }
+    }
+  }
+
+  lines.push(
+    'Completed shops can be sent to Finance as expenses when the Finance connection is enabled.',
+  )
+  return clip(lines.join('\n'))
+}
+
+function safeJson(raw: string): unknown {
+  try {
+    return JSON.parse(raw)
+  } catch {
+    return {}
+  }
+}

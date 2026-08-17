@@ -3346,3 +3346,36 @@ html[data-spotlight='on'] body::after {
     padding-bottom: 5rem;
   }
 }
+
+.ai-thread {
+  display: grid;
+  gap: 0.65rem;
+  min-height: 12rem;
+}
+
+.ai-bubble {
+  max-width: 44rem;
+  border-radius: 1.1rem;
+  padding: 0.65rem 0.8rem;
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.ai-bubble-user {
+  margin-left: auto;
+  background: color-mix(in srgb, var(--primary) 18%, transparent);
+}
+
+.ai-bubble strong {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  font-size: 0.68rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--fg-muted);
+}
+
+.ai-bubble p {
+  margin: 0.35rem 0 0;
+  white-space: pre-wrap;
+}

@@ -21,6 +21,7 @@ export type View =
   | 'purchase'
   | 'exercise'
   | 'settings'
+  | 'ai'
 
 /** One planned dish for a person on a given day and meal. */
 export interface WeekMealSlot {

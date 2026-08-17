@@ -10,6 +10,7 @@ import {
   Package,
   Settings,
   ShoppingCart,
+  Sparkles,
 } from 'lucide-react'
 import { LOCALES, t, type Locale } from '../../i18n'
 import type { View } from '../../types'
@@ -58,6 +59,7 @@ export function Sidebar({
     { id: 'exercise', label: t(locale, 'navExercise'), icon: Dumbbell },
     { id: 'history', label: t(locale, 'navHistory'), icon: CalendarDays },
     { id: 'settings', label: t(locale, 'navSettings'), icon: Settings },
+    { id: 'ai', label: t(locale, 'navAi'), icon: Sparkles },
   ]
 
   return (

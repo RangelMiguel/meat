@@ -10,6 +10,7 @@ import { PlanForm } from './components/PlanForm'
 import { PurchaseView } from './components/PurchaseView'
 import { RecipesView } from './components/RecipesView'
 import { SettingsView } from './components/SettingsView'
+import { AiView } from './components/AiView'
 import { WeekPlanView } from './components/WeekPlanView'
 import { TodayView } from './components/TodayView'
 import { PwaProvider } from './components/PwaProvider'
@@ -188,6 +189,7 @@ export default function App() {
                 }}
               />
             )}
+            {view === 'ai' && <AiView locale={locale} onGoSettings={() => goTo('settings')} />}
           </>
         )}
         </>
