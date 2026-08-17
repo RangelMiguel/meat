@@ -1,5 +1,5 @@
-import { useMemo, useState } from 'react'
-import { ChefHat, Pencil, Plus, RotateCcw, Trash2 } from 'lucide-react'
+import { useMemo, useRef, useState } from 'react'
+import { ChefHat, Download, Pencil, Plus, RotateCcw, Trash2, Upload } from 'lucide-react'
 import {
   CUISINE_OPTIONS,
   INGREDIENTS,
@@ -20,7 +20,12 @@ import {
 } from '../i18n'
 import { formatAmount } from '../lib/calories'
 import { canMakeServings } from '../lib/portions'
-import { displaySteps, isUserRecipe } from '../lib/recipeLibrary'
+import {
+  buildRecipePack,
+  displaySteps,
+  isUserRecipe,
+  parseRecipePack,
+} from '../lib/recipeLibrary'
 import { RecipeForm } from './RecipeForm'
 
 interface Props {
@@ -36,6 +41,8 @@ export function RecipesView({ store, onPrepare }: Props) {
   const [cuisine, setCuisine] = useState<Cuisine | 'all'>('all')
   const [category, setCategory] = useState<string>('all')
   const [editor, setEditor] = useState<'closed' | 'create' | 'edit'>('closed')
+  const [packFlash, setPackFlash] = useState<string | null>(null)
+  const fileRef = useRef<HTMLInputElement>(null)
 
   const categories = useMemo(() => {
     const pool =
@@ -82,6 +89,62 @@ export function RecipesView({ store, onPrepare }: Props) {
     setEditor('closed')
   }
 
+  const householdRecipes = useMemo(() => {
+    const custom = store.customRecipes
+    const overrides = Object.values(store.recipeOverrides)
+    const seen = new Set(custom.map((recipe) => recipe.id))
+    return [...custom, ...overrides.filter((recipe) => !seen.has(recipe.id))]
+  }, [store.customRecipes, store.recipeOverrides])
+
+  const downloadPack = (recipes: Recipe[], filename: string) => {
+    const blob = new Blob([JSON.stringify(buildRecipePack(recipes), null, 2)], {
+      type: 'application/json',
+    })
+    const url = URL.createObjectURL(blob)
+    const link = document.createElement('a')
+    link.href = url
+    link.download = filename
+    link.click()
+    URL.revokeObjectURL(url)
+  }
+
+  const exportAll = () => {
+    const pack = householdRecipes.length ? householdRecipes : selected ? [selected] : []
+    if (!pack.length) {
+      setPackFlash(t(locale, 'recipePackEmpty'))
+      return
+    }
+    downloadPack(pack, 'meat-recipes.json')
+    setPackFlash(t(locale, 'recipePackExported', { n: pack.length }))
+  }
+
+  const exportOne = (recipe: Recipe) => {
+    const slug = recipe.id.replace(/[^a-z0-9-]+/gi, '-').toLowerCase()
+    downloadPack([recipe], `meat-recipe-${slug}.json`)
+    setPackFlash(t(locale, 'recipePackExported', { n: 1 }))
+  }
+
+  const importFile = async (file: File) => {
+    setPackFlash(null)
+    try {
+      const raw = JSON.parse(await file.text()) as unknown
+      const { recipes: incoming, skipped } = parseRecipePack(raw)
+      if (!incoming.length) {
+        setPackFlash(t(locale, skipped ? 'recipePackNoneValid' : 'recipePackInvalid'))
+        return
+      }
+      await store.importRecipes(incoming)
+      setSelectedId(incoming[0].id)
+      setPackFlash(
+        skipped
+          ? t(locale, 'recipePackImportedSome', { n: incoming.length, skipped })
+          : t(locale, 'recipePackImported', { n: incoming.length }),
+      )
+    } catch {
+      setPackFlash(t(locale, 'recipePackInvalid'))
+    }
+  }
+
   if (editor !== 'closed') {
     return (
       <div className="stack-lg">
@@ -107,6 +170,17 @@ export function RecipesView({ store, onPrepare }: Props) {
           {t(locale, 'recipesCount', { recipes: recipes.length, ingredients: INGREDIENTS.length })}
         </span>
       </div>
+      <input
+        ref={fileRef}
+        type="file"
+        accept="application/json,.json"
+        className="sr-only"
+        onChange={(e) => {
+          const file = e.target.files?.[0]
+          e.target.value = ''
+          if (file) void importFile(file)
+        }}
+      />
 
       <div className="card">
         <div className="form-row form-row-3" style={{ marginBottom: 0 }}>
@@ -154,6 +228,26 @@ export function RecipesView({ store, onPrepare }: Props) {
             </select>
           </div>
         </div>
+      </div>
+
+      <div className="card">
+        <div className="card-header">
+          <div>
+            <h4>{t(locale, 'recipePackTitle')}</h4>
+            <p className="sub">{t(locale, 'recipePackSub')}</p>
+          </div>
+          <div className="btn-row" style={{ margin: 0 }}>
+            <button type="button" className="btn btn-secondary btn-sm" onClick={() => fileRef.current?.click()}>
+              <Upload size={14} />
+              {t(locale, 'recipePackImport')}
+            </button>
+            <button type="button" className="btn btn-secondary btn-sm" onClick={exportAll}>
+              <Download size={14} />
+              {t(locale, 'recipePackExport')}
+            </button>
+          </div>
+        </div>
+        {packFlash && <p className="field-hint">{packFlash}</p>}
       </div>
 
       <div className="recipes-layout">
@@ -220,6 +314,14 @@ export function RecipesView({ store, onPrepare }: Props) {
                 <span className="badge badge-primary">
                   {t(locale, 'servingsN', { n: selected.servings })}
                 </span>
+                <button
+                  type="button"
+                  className="btn btn-ghost btn-sm"
+                  onClick={() => exportOne(selected)}
+                >
+                  <Download size={14} />
+                  {t(locale, 'recipePackExportOne')}
+                </button>
                 <button
                   type="button"
                   className="btn btn-secondary btn-sm"

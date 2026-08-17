@@ -2,7 +2,7 @@ import { RECIPES, getRecipe as getCatalogRecipe } from '../data/catalog'
 import { RECIPE_STEPS } from '../data/recipeSteps'
 import { RECIPE_STEPS_ES } from '../data/recipeStepsEs'
 import type { Recipe } from '../data/types'
-import { getIngredient } from '../data/catalog'
+import { getIngredient, INGREDIENTS } from '../data/catalog'
 import type { Locale } from '../i18n'
 
 export const USER_RECIPE_PREFIX = 'user-'
@@ -114,4 +114,77 @@ export function parseRecipeOverrides(raw: unknown): Record<string, Recipe> {
     if (recipe) out[id] = recipe
   }
   return out
+}
+
+export const RECIPE_PACK_KIND = 'meat-recipes'
+
+export type RecipePack = {
+  kind: typeof RECIPE_PACK_KIND
+  version: 1
+  recipes: Recipe[]
+}
+
+export function buildRecipePack(recipes: Recipe[]): RecipePack {
+  return { kind: RECIPE_PACK_KIND, version: 1, recipes }
+}
+
+export function parseRecipePack(raw: unknown): { recipes: Recipe[]; skipped: number } {
+  const list = extractRecipeList(raw)
+  const recipes: Recipe[] = []
+  let skipped = 0
+  for (const item of list) {
+    const normalized = normalizeImportedRecipe(item)
+    const recipe = parseRecipe(normalized)
+    if (!recipe || recipe.ingredients.length === 0) {
+      skipped += 1
+      continue
+    }
+    recipes.push(recipe)
+  }
+  return { recipes, skipped }
+}
+
+function extractRecipeList(raw: unknown): unknown[] {
+  if (Array.isArray(raw)) return raw
+  if (!raw || typeof raw !== 'object') return []
+  const rec = raw as { recipes?: unknown; customRecipes?: unknown }
+  if (Array.isArray(rec.recipes)) return rec.recipes
+  if (Array.isArray(rec.customRecipes)) return rec.customRecipes
+  if (typeof (raw as { name?: unknown }).name === 'string') return [raw]
+  return []
+}
+
+function normalizeImportedRecipe(raw: unknown): unknown {
+  if (!raw || typeof raw !== 'object') return raw
+  const rec = raw as { id?: unknown; ingredients?: unknown }
+  const id =
+    typeof rec.id === 'string' && rec.id.trim()
+      ? rec.id.trim()
+      : `${USER_RECIPE_PREFIX}${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`
+  const ingredients = Array.isArray(rec.ingredients)
+    ? rec.ingredients.map((line) => {
+        if (!line || typeof line !== 'object') return line
+        const item = line as { ingredientId?: unknown; ingredient?: unknown }
+        const hint =
+          (typeof item.ingredientId === 'string' && item.ingredientId) ||
+          (typeof item.ingredient === 'string' && item.ingredient) ||
+          ''
+        const resolved = resolveImportedIngredient(hint)
+        return { ...item, ingredientId: resolved || hint }
+      })
+    : rec.ingredients
+  return { ...rec, id, ingredients }
+}
+
+function resolveImportedIngredient(hint: string): string | undefined {
+  if (!hint) return undefined
+  if (getIngredient(hint)) return hint
+  const q = hint.toLowerCase().normalize('NFD').replace(/\p{M}/gu, '').trim()
+  const hit = INGREDIENTS.find((ing) => {
+    const names = [ing.id, ing.name, ing.nameEs].map((name) =>
+      name.toLowerCase().normalize('NFD').replace(/\p{M}/gu, ''),
+    )
+    return names.includes(q)
+  })
+  return hit?.id
 }

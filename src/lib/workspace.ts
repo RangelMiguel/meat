@@ -436,6 +436,10 @@ const actionSchema = z.discriminatedUnion('action', [
     ),
   }),
   z.object({ action: z.literal('saveRecipe'), recipe: recipeSchema }),
+  z.object({
+    action: z.literal('importRecipes'),
+    recipes: z.array(recipeSchema).min(1).max(200),
+  }),
   z.object({ action: z.literal('deleteRecipe'), id: z.string() }),
   z.object({ action: z.literal('resetRecipe'), id: z.string() }),
   z.object({
@@ -1049,6 +1053,38 @@ export async function mutateWorkspace(userId: string, raw: unknown): Promise<Wor
           },
         })
       }
+      break
+    }
+    case 'importRecipes': {
+      const kitchen = household.kitchen!
+      let custom = parseRecipes(kitchen.recipesJson)
+      let overrides = parseOverrides(kitchen.overridesJson)
+      for (const incoming of body.recipes) {
+        const id = incoming.id ?? `${USER_RECIPE_PREFIX}${Date.now().toString(36)}`
+        const recipe: Recipe = {
+          ...incoming,
+          id,
+          name: incoming.name.trim() || 'Untitled recipe',
+          nameEs: (incoming.nameEs || incoming.name).trim() || 'Untitled recipe',
+          servings: Math.max(1, incoming.servings || 4),
+          ingredients: incoming.ingredients.filter((line) => line.ingredientId && line.grams > 0),
+          steps: (incoming.steps ?? []).map((step) => step.trim()).filter(Boolean),
+        }
+        if (!recipe.ingredients.length) continue
+        if (isUserRecipe(id) || custom.some((item) => item.id === id)) {
+          const idx = custom.findIndex((item) => item.id === id)
+          custom = idx === -1 ? [recipe, ...custom] : custom.map((item) => (item.id === id ? recipe : item))
+        } else {
+          overrides = { ...overrides, [id]: recipe }
+        }
+      }
+      await prisma.kitchen.update({
+        where: { id: kitchen.id },
+        data: {
+          recipesJson: JSON.stringify(custom),
+          overridesJson: JSON.stringify(overrides),
+        },
+      })
       break
     }
     case 'saveRecipe': {

@@ -462,6 +462,14 @@ export function useAppStore() {
     [kitchen],
   )
 
+  const importRecipes = useCallback(
+    async (recipes: Recipe[]) => {
+      if (!recipes.length) return
+      await mutate({ action: 'importRecipes', recipes })
+    },
+    [mutate],
+  )
+
   const saveRecipe = useCallback(
     (input: Omit<Recipe, 'id'> & { id?: string }) => {
       const id = input.id ?? `${USER_RECIPE_PREFIX}${uid()}`
@@ -797,6 +805,7 @@ export function useAppStore() {
     recipes,
     recipeById,
     saveRecipe,
+    importRecipes,
     deleteRecipe,
     resetRecipe,
     reloadWorkspace,
