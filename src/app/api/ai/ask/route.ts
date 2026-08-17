@@ -7,6 +7,7 @@ import { buildMeatContext } from '@/lib/ai/context'
 import { loadPrivateAiSettings, loadPublicAiSettings } from '@/lib/ai/settings'
 import { executeMeatTool, MEAT_TOOLS } from '@/lib/ai/tools'
 import { requireAddon } from '@/lib/modules/access'
+import { loadMeatPrivacy } from '@/lib/ai/privacyBook'
 
 const TOOL_RULES = [
   'You can read and change this kitchen with tools.',
@@ -16,6 +17,7 @@ const TOOL_RULES = [
   'After the first turn there is no snapshot — use list_* / search_* / lookup_nutrition if you need current or product numbers.',
   'Do not invent calories for store products when the lookup tool is available. If the tool returns an estimate, say so.',
   'Confirm what was actually saved using the tool result.',
+  'Never ask for or repeat personal names, emails, phones, keys, or account numbers. Refer to people as You / Member N.',
 ].join('\n')
 
 export async function POST(req: Request) {
@@ -66,10 +68,12 @@ export async function POST(req: Request) {
           TOOL_RULES,
         ].join('\n')
 
+    const privacy = await loadMeatPrivacy(session.userId)
     const result = await completeWithTools({
       settings,
       messages: [{ role: 'system', content: system }, ...body.messages.slice(-12)],
       tools: MEAT_TOOLS,
+      privacy: privacy.book,
       execute: (call) => executeMeatTool({ userId: session.userId }, call),
     })
     return jsonOk({

@@ -1,5 +1,6 @@
 import { completeWithUserSettings } from '../ai/complete'
 import { loadPrivateAiSettings } from '../ai/settings'
+import { loadMeatPrivacy } from '../ai/privacyBook'
 import type { NutritionHit } from './types'
 
 export async function estimateNutritionWithAi(
@@ -10,6 +11,7 @@ export async function estimateNutritionWithAi(
   if (!settings) return null
   const label = prompt.query?.trim() || (prompt.barcode ? `barcode ${prompt.barcode}` : '')
   if (!label) return null
+  const privacy = await loadMeatPrivacy(userId)
   const result = await completeWithUserSettings(settings, [
     {
       role: 'system',
@@ -27,7 +29,7 @@ export async function estimateNutritionWithAi(
         ? `Product: ${label}. Barcode: ${prompt.barcode}.`
         : `Product: ${label}`,
     },
-  ], { temperature: 0.1 })
+  ], { temperature: 0.1, privacy: privacy.book })
 
   const parsed = parseEstimate(result.text)
   if (!parsed) return null

@@ -3,6 +3,8 @@ import { todayKey } from '../calories'
 import { prisma } from '../db'
 import { mondayOf, parseWeekPlan, upcomingSlots } from '../weekPlan'
 import type { CaloriePlan } from '../../types'
+import { redactForModel } from './privacy'
+import { loadMeatPrivacy } from './privacyBook'
 
 function parsePlan(raw: string | null): CaloriePlan | null {
   if (!raw) return null
@@ -32,10 +34,12 @@ export async function buildMeatContext(userId: string): Promise<string> {
 
   const today = todayKey()
   const plan = parsePlan(member.planJson)
+  const privacy = await loadMeatPrivacy(userId)
   const lines: string[] = [
     'App: meat (meals, calories, kitchen)',
-    `Person: ${member.name}`,
+    'Person: You',
     `Today: ${today}`,
+    'Personal names, emails, phones, and keys are omitted.',
   ]
   if (plan) {
     lines.push(
@@ -90,7 +94,7 @@ export async function buildMeatContext(userId: string): Promise<string> {
   lines.push(
     'Completed shops can be sent to Finance as expenses when the Finance connection is enabled.',
   )
-  return clip(lines.join('\n'))
+  return clip(redactForModel(lines.join('\n'), privacy.book))
 }
 
 function safeJson(raw: string): unknown {
