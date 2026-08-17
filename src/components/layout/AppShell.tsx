@@ -3,6 +3,7 @@ import { Menu, X } from 'lucide-react'
 import { t, type Locale } from '../../i18n'
 import type { View } from '../../types'
 import { Sidebar } from './Sidebar'
+import { AppLauncher } from './AppLauncher'
 
 interface Props {
   locale: Locale
@@ -15,6 +16,7 @@ interface Props {
   onLocale: (locale: Locale) => void
   onLogout: () => void
   installedModules?: string[]
+  financeUrl?: string
   children: ReactNode
 }
 
@@ -29,6 +31,7 @@ export function AppShell({
   onLocale,
   onLogout,
   installedModules,
+  financeUrl,
   children,
 }: Props) {
   const [open, setOpen] = useState(false)
@@ -101,7 +104,20 @@ export function AppShell({
               ) : null}
             </div>
           </div>
-          {userName ? <div className="topbar-user">{userName}</div> : null}
+          <div className="topbar-end">
+            <AppLauncher
+              locale={locale}
+              apps={[
+                {
+                  id: 'finance',
+                  label: t(locale, 'suiteFinance'),
+                  hint: financeUrl ? t(locale, 'suiteFinanceHint') : t(locale, 'suiteNeedUrl'),
+                  href: financeUrl || '',
+                },
+              ]}
+            />
+            {userName ? <div className="topbar-user">{userName}</div> : null}
+          </div>
         </header>
 
         <main id="main-content" className="page-stage" tabIndex={-1}>

@@ -236,6 +236,11 @@ export default function App() {
           onLocale={store.setLocale}
           onLogout={store.logOut}
           installedModules={store.installedModules}
+          financeUrl={
+            store.finance.baseUrl ||
+            (typeof process !== 'undefined' ? process.env.NEXT_PUBLIC_FINANCE_URL : '') ||
+            ''
+          }
           footer={<span>{statusLine}</span>}
         >
           {screens}
