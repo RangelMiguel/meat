@@ -22,6 +22,9 @@ export function localeTag(locale: Locale): string {
 const en = {
   brandTagline: 'Calorie tracker',
   navMain: 'Main',
+  skipToContent: 'Skip to content',
+  openMenu: 'Open menu',
+  closeMenu: 'Close menu',
   navToday: 'Today',
   navPlan: 'Plan',
   navWeek: 'Week',
@@ -609,6 +612,9 @@ const en = {
 const es: Record<keyof typeof en, string> = {
   brandTagline: 'Control de calorías',
   navMain: 'Principal',
+  skipToContent: 'Saltar al contenido',
+  openMenu: 'Abrir menú',
+  closeMenu: 'Cerrar menú',
   navToday: 'Hoy',
   navPlan: 'Plan',
   navWeek: 'Semana',

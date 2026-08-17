@@ -1,16 +1,7 @@
 import { useEffect, useState } from 'react'
-import {
-  BookOpen,
-  CalendarDays,
-  CalendarRange,
-  ClipboardList,
-  Dumbbell,
-  Flame,
-  Package,
-  Settings,
-  ShoppingCart,
-} from 'lucide-react'
 import { AuthView } from './components/AuthView'
+import { AmbientLights } from './components/AmbientLights'
+import { AppShell } from './components/layout/AppShell'
 import { ExerciseView } from './components/ExerciseView'
 import { CookView } from './components/CookView'
 import { HistoryView } from './components/HistoryView'
@@ -75,99 +66,8 @@ export default function App() {
   const planMember =
     store.household.find((member) => member.id === planMemberId) ?? store.myMember ?? null
 
-  return (
-    <PwaProvider>
-    <div className="app">
-      <header className="app-header">
-        <div className="container header-inner">
-          <div className="brand">
-            <div className="brand-mark">kcal</div>
-            <div>
-              <h1>meat</h1>
-              <p>{t(locale, 'brandTagline')}</p>
-            </div>
-          </div>
-
-          {store.isLoggedIn && (
-          <nav className="main-nav" aria-label={t(locale, 'navMain')}>
-            <button
-              type="button"
-              className={`nav-btn${view === 'today' && !cookSession ? ' is-active' : ''}`}
-              onClick={() => goTo('today')}
-            >
-              <Flame size={16} />
-              {t(locale, 'navToday')}
-            </button>
-            <button
-              type="button"
-              className={`nav-btn${view === 'plan' ? ' is-active' : ''}`}
-              onClick={() => goTo('plan')}
-            >
-              <ClipboardList size={16} />
-              {t(locale, 'navPlan')}
-            </button>
-            <button
-              type="button"
-              className={`nav-btn${view === 'week' ? ' is-active' : ''}`}
-              onClick={() => goTo('week')}
-            >
-              <CalendarRange size={16} />
-              {t(locale, 'navWeek')}
-            </button>
-            <button
-              type="button"
-              className={`nav-btn${view === 'recipes' ? ' is-active' : ''}`}
-              onClick={() => goTo('recipes')}
-            >
-              <BookOpen size={16} />
-              {t(locale, 'navRecipes')}
-            </button>
-            <button
-              type="button"
-              className={`nav-btn${view === 'inventory' && !cookSession ? ' is-active' : ''}`}
-              onClick={() => goTo('inventory')}
-            >
-              <Package size={16} />
-              {t(locale, 'navInventory')}
-            </button>
-            <button
-              type="button"
-              className={`nav-btn${view === 'purchase' && !cookSession ? ' is-active' : ''}`}
-              onClick={() => goTo('purchase')}
-            >
-              <ShoppingCart size={16} />
-              {t(locale, 'navPurchase')}
-            </button>
-            <button
-              type="button"
-              className={`nav-btn${view === 'exercise' ? ' is-active' : ''}`}
-              onClick={() => goTo('exercise')}
-            >
-              <Dumbbell size={16} />
-              {t(locale, 'navExercise')}
-            </button>
-            <button
-              type="button"
-              className={`nav-btn${view === 'history' ? ' is-active' : ''}`}
-              onClick={() => goTo('history')}
-            >
-              <CalendarDays size={16} />
-              {t(locale, 'navHistory')}
-            </button>
-            <button
-              type="button"
-              className={`nav-btn${view === 'settings' ? ' is-active' : ''}`}
-              onClick={() => goTo('settings')}
-            >
-              <Settings size={16} />
-              {t(locale, 'navSettings')}
-            </button>
-          </nav>
-          )}
-        </div>
-      </header>
-
-      <main className="main container">
+  const screens = (
+        <>
         {store.status === 'loading' ? (
           <div className="card auth-card">
             <div className="card-header">
@@ -290,21 +190,40 @@ export default function App() {
             )}
           </>
         )}
-      </main>
+        </>
+  )
 
-      <footer className="footer container">
-        <span>
-          {!store.isLoggedIn
-            ? t(locale, 'authSub')
-            : store.householdGoal
-              ? t(locale, 'householdGoalLine', {
-                  eaten: Math.round(store.todayTotals.kcal),
-                  goal: store.householdGoal + store.todayBurned,
-                })
-              : t(locale, 'noPlanYet')}
-        </span>
-      </footer>
-    </div>
+  const statusLine = !store.isLoggedIn
+    ? t(locale, 'authSub')
+    : store.householdGoal
+      ? t(locale, 'householdGoalLine', {
+          eaten: Math.round(store.todayTotals.kcal),
+          goal: store.householdGoal + store.todayBurned,
+        })
+      : t(locale, 'noPlanYet')
+
+  return (
+    <PwaProvider>
+      <AmbientLights />
+      {store.isLoggedIn ? (
+        <AppShell
+          locale={locale}
+          view={view}
+          cooking={Boolean(cookSession)}
+          householdName={store.family?.name ?? store.myMember?.name}
+          userName={store.account?.displayName}
+          onGo={goTo}
+          onLocale={store.setLocale}
+          onLogout={store.logOut}
+          footer={<span>{statusLine}</span>}
+        >
+          {screens}
+        </AppShell>
+      ) : (
+        <div className="auth-stage" id="main-content">
+          {screens}
+        </div>
+      )}
     </PwaProvider>
   )
 }

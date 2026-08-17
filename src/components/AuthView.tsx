@@ -53,7 +53,8 @@ export function AuthView({ store }: Props) {
   }
 
   return (
-    <div className="card auth-card">
+    <div className="auth-card">
+      <div className="auth-card-inner">
       <div className="theme-pills" style={{ marginBottom: '0.85rem' }}>
         {LOCALES.map((item) => (
           <button
@@ -151,6 +152,7 @@ export function AuthView({ store }: Props) {
           {t(locale, 'passkeyHint')}
         </p>
       </form>
+      </div>
     </div>
   )
 }
