@@ -3472,7 +3472,7 @@ html[data-spotlight='on'] body::after {
   padding: 0.75rem;
   border-radius: 1.1rem;
   border: 1px solid var(--line);
-  background: var(--card, #12151c);
+  background: var(--bg-card, #12151c);
   box-shadow: 0 18px 40px rgba(0, 0, 0, 0.35);
 }
 
