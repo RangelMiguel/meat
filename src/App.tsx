@@ -68,7 +68,7 @@ export default function App() {
   useEffect(() => {
     if (!store.isLoggedIn) return
     if (
-      (view === 'week' || view === 'exercise' || view === 'history' || view === 'ai') &&
+      (view === 'week' || view === 'exercise' || view === 'history') &&
       !store.hasModule(view)
     ) {
       goTo('marketplace')

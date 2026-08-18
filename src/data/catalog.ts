@@ -74,15 +74,30 @@ export function formatCookAmount(ingredientId: string, amount: number): string {
 }
 
 /** Resolve a recipe’s ingredient list with full ingredient records + line macros. Does not sum a recipe total. */
-export function resolveRecipeIngredients(recipe: Recipe): ResolvedIngredientLine[] {
+export function resolveRecipeIngredients(
+  recipe: Recipe,
+  extras: Ingredient[] = [],
+): ResolvedIngredientLine[] {
   return recipe.ingredients.map((line) => {
-    const ingredient = requireIngredient(line.ingredientId)
-    return {
-      line,
-      ingredient,
-      lineMacros: macrosForAmount(line.ingredientId, line.grams),
-    }
+    const ingredient =
+      getIngredient(line.ingredientId) ??
+      extras.find((item) => item.id === line.ingredientId) ??
+      placeholderIngredient(line.ingredientId)
+    const lineMacros = getIngredient(line.ingredientId)
+      ? macrosForAmount(line.ingredientId, line.grams)
+      : macrosForGrams(ingredient.per100g, line.grams)
+    return { line, ingredient, lineMacros }
   })
+}
+
+function placeholderIngredient(id: string): Ingredient {
+  return {
+    id,
+    name: id,
+    nameEs: id,
+    category: 'other',
+    per100g: { kcal: 0, protein: 0, carbs: 0, fat: 0 },
+  }
 }
 
 /** Validate every recipe ingredient id exists. Throws if broken. */

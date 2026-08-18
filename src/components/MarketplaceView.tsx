@@ -15,7 +15,7 @@ const MODULE_COPY: Record<AppModuleId, { title: MsgId; body: MsgId } | undefined
   week: { title: 'moduleWeekTitle', body: 'moduleWeekBody' },
   exercise: { title: 'moduleExerciseTitle', body: 'moduleExerciseBody' },
   history: { title: 'moduleHistoryTitle', body: 'moduleHistoryBody' },
-  ai: { title: 'moduleAiTitle', body: 'moduleAiBody' },
+  ai: undefined,
 }
 
 interface Props {

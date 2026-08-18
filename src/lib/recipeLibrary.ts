@@ -72,7 +72,7 @@ export function parseRecipe(raw: unknown): Recipe | null {
   if (!Array.isArray(rec.ingredients)) return null
   const ingredients = rec.ingredients.flatMap((line) => {
     if (!line || typeof line !== 'object') return []
-    if (typeof line.ingredientId !== 'string' || !getIngredient(line.ingredientId)) return []
+    if (typeof line.ingredientId !== 'string' || !line.ingredientId.trim()) return []
     const grams = Number(line.grams)
     if (!Number.isFinite(grams) || grams < 0) return []
     return [

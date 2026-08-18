@@ -586,7 +586,7 @@ const en = {
   aiNeedKey: 'Set a provider and API key (or a local URL) in Settings.',
   aiGoSettings: 'Go to Settings',
   aiEmpty:
-    'Try: “How many calories in a bag of Fritos?”, “Add a chicken taco recipe”, or “Log 200g chicken breast for lunch.”',
+    'Try: “Add a Gansito snack”, “Create a chips recipe”, or “Change the tacos recipe to 6 servings.”',
   aiYou: 'You',
   aiAssistant: 'Assistant',
   aiThinking: 'Thinking…',
@@ -1277,7 +1277,7 @@ const es: Record<keyof typeof en, string> = {
   aiNeedKey: 'Configura un proveedor y una llave (o una URL local) en Ajustes.',
   aiGoSettings: 'Ir a Ajustes',
   aiEmpty:
-    'Prueba: “¿Cuántas calorías tiene una bolsa de Fritos?”, “Agrega una receta de tacos de pollo” o “Registra 200 g de pechuga para el almuerzo.”',
+    'Prueba: “Agrega un Gansito”, “Crea una receta de Sabritas” o “Cambia la receta de tacos a 6 porciones.”',
   aiYou: 'Tú',
   aiAssistant: 'Asistente',
   aiThinking: 'Pensando…',

@@ -2,6 +2,13 @@ import { getIngredient, INGREDIENTS, macrosForAmount, RECIPES } from '../../data
 import type { Cuisine, Recipe } from '../../data/types'
 import { todayKey } from '../calories'
 import { prisma } from '../db'
+import {
+  findIngredient,
+  macrosForCustomAmount,
+  parseCustomIngredients,
+  per100gFromServing,
+  snackIngredientId,
+} from '../customIngredients'
 import { findMergedRecipe, mergeRecipeLibrary, parseCustomRecipes, parseRecipeOverrides } from '../recipeLibrary'
 import { parseWeekPlan } from '../weekPlan'
 import { isModuleInstalled } from '../modules/access'
@@ -79,9 +86,31 @@ export const MEAT_TOOLS: ToolSpec[] = [
     },
   },
   {
+    name: 'save_packaged_food',
+    description:
+      'Save a packaged snack or store product (chips, Gansito, Nito, soda, yogurt, etc.) as a household ingredient and a 1-serving recipe so it can be logged later. Use lookup_nutrition first when calories are unknown.',
+    parameters: {
+      type: 'object',
+      properties: {
+        name: { type: 'string' },
+        nameEs: { type: 'string' },
+        grams: { type: 'number', description: 'One serving or package in grams' },
+        kcal: { type: 'number' },
+        protein: { type: 'number' },
+        carbs: { type: 'number' },
+        fat: { type: 'number' },
+        query: { type: 'string', description: 'Search term if macros are not provided' },
+        barcode: { type: 'string' },
+        category: { type: 'string' },
+      },
+      required: ['name'],
+      additionalProperties: false,
+    },
+  },
+  {
     name: 'add_recipe',
     description:
-      'Create a household recipe. Ingredients must exist in the catalog — search_ingredients first and pass ingredient ids (or unambiguous names) plus grams (or ml for liquids).',
+      'Create a household recipe. Use catalog ingredient ids, household snack ids (snack-…), or names. For packaged snacks, prefer save_packaged_food or lookup_nutrition first.',
     parameters: {
       type: 'object',
       properties: {
@@ -106,6 +135,38 @@ export const MEAT_TOOLS: ToolSpec[] = [
         },
       },
       required: ['name', 'ingredients'],
+      additionalProperties: false,
+    },
+  },
+  {
+    name: 'update_recipe',
+    description:
+      'Change an existing household or catalog recipe (name, servings, ingredients, steps). Pass the recipe id or name, plus only the fields to change. Ingredients replace the whole list when provided.',
+    parameters: {
+      type: 'object',
+      properties: {
+        recipe: { type: 'string', description: 'Recipe id or name' },
+        name: { type: 'string' },
+        nameEs: { type: 'string' },
+        category: { type: 'string' },
+        servings: { type: 'number' },
+        cuisine: { type: 'string', enum: ['mexican', 'american', 'italian', 'chinese'] },
+        summary: { type: 'string' },
+        steps: { type: 'array', items: { type: 'string' } },
+        ingredients: {
+          type: 'array',
+          items: {
+            type: 'object',
+            properties: {
+              ingredient: { type: 'string' },
+              grams: { type: 'number' },
+              note: { type: 'string' },
+            },
+            required: ['ingredient', 'grams'],
+          },
+        },
+      },
+      required: ['recipe'],
       additionalProperties: false,
     },
   },
@@ -235,7 +296,7 @@ export async function executeMeatTool(ctx: MeatToolContext, call: ToolCallReques
   }
   switch (call.name) {
     case 'search_ingredients':
-      return searchIngredients(str(args.query), num(args.limit))
+      return searchIngredients(ctx, str(args.query), num(args.limit))
     case 'search_recipes':
       return searchRecipes(ctx, str(args.query), num(args.limit))
     case 'list_inventory':
@@ -246,8 +307,12 @@ export async function executeMeatTool(ctx: MeatToolContext, call: ToolCallReques
       return listToday(ctx)
     case 'lookup_nutrition':
       return lookupProduct(ctx, str(args.query), str(args.barcode))
+    case 'save_packaged_food':
+      return savePackagedFood(ctx, args)
     case 'add_recipe':
       return addRecipe(ctx, args)
+    case 'update_recipe':
+      return updateRecipe(ctx, args)
     case 'add_food_entry':
       return addFood(ctx, args)
     case 'add_inventory':
@@ -305,16 +370,23 @@ async function lookupProduct(
   }
 }
 
-function searchIngredients(query?: string, limit?: number): ToolExecResult {
+async function searchIngredients(
+  ctx: MeatToolContext,
+  query?: string,
+  limit?: number,
+): Promise<ToolExecResult> {
   if (!query) return { ok: false, summary: 'query is required', error: 'query' }
+  const { extras } = await kitchenPayload(ctx.userId)
   const take = Math.min(Math.max(limit ?? 12, 1), 25)
-  const hits = INGREDIENTS.map((ing) => ({
-    id: ing.id,
-    name: ing.name,
-    nameEs: ing.nameEs,
-    category: ing.category,
-    score: bestScore(query, [ing.id, ing.name, ing.nameEs]),
-  }))
+  const pool = [...INGREDIENTS, ...extras]
+  const hits = pool
+    .map((ing) => ({
+      id: ing.id,
+      name: ing.name,
+      nameEs: ing.nameEs,
+      category: ing.category,
+      score: bestScore(query, [ing.id, ing.name, ing.nameEs]),
+    }))
     .filter((row) => row.score >= 50)
     .sort((a, b) => b.score - a.score)
     .slice(0, take)
@@ -333,7 +405,15 @@ async function kitchenPayload(userId: string) {
   const kitchen = member.household.kitchen
   const custom = parseCustomRecipes(safeJson(kitchen.recipesJson))
   const overrides = parseRecipeOverrides(safeJson(kitchen.overridesJson))
-  return { member, kitchen, custom, overrides, recipes: mergeRecipeLibrary(custom, overrides) }
+  const extras = parseCustomIngredients(safeJson(kitchen.ingredientsJson))
+  return {
+    member,
+    kitchen,
+    custom,
+    overrides,
+    extras,
+    recipes: mergeRecipeLibrary(custom, overrides),
+  }
 }
 
 async function searchRecipes(ctx: MeatToolContext, query?: string, limit?: number): Promise<ToolExecResult> {
@@ -419,9 +499,75 @@ async function listToday(ctx: MeatToolContext): Promise<ToolExecResult> {
   }
 }
 
+async function savePackagedFood(ctx: MeatToolContext, args: Record<string, unknown>): Promise<ToolExecResult> {
+  const name = str(args.name)
+  if (!name) return { ok: false, summary: 'name is required', error: 'name' }
+  let grams = num(args.grams)
+  let kcal = num(args.kcal)
+  let protein = num(args.protein) ?? 0
+  let carbs = num(args.carbs) ?? 0
+  let fat = num(args.fat) ?? 0
+  if (kcal == null || !grams) {
+    const hit = await lookupNutrition(ctx.userId, {
+      query: str(args.query) || name,
+      barcode: str(args.barcode),
+    })
+    if (!hit.hit) {
+      return { ok: false, summary: `No nutrition found for ${name}. Provide kcal and grams.`, error: 'nutrition' }
+    }
+    const pack = hit.hit.pack && (!grams || grams >= 80) ? hit.hit.pack : hit.hit.serving
+    kcal = kcal ?? pack.kcal
+    protein = num(args.protein) ?? pack.protein
+    carbs = num(args.carbs) ?? pack.carbs
+    fat = num(args.fat) ?? pack.fat
+    if (!grams) {
+      const label = hit.hit.servingLabel || hit.hit.pack?.label || ''
+      const parsed = Number((label.match(/(\d+(?:\.\d+)?)\s*g/i) || [])[1])
+      grams = Number.isFinite(parsed) && parsed > 0 ? parsed : 30
+    }
+  }
+  if (kcal == null || kcal <= 0 || !grams || grams <= 0) {
+    return { ok: false, summary: 'Need kcal and grams for this snack', error: 'nutrition' }
+  }
+  const per100g = per100gFromServing({ kcal, protein, carbs, fat }, grams)
+  const id = snackIngredientId(name)
+  await mutateWorkspace(ctx.userId, {
+    action: 'saveIngredient',
+    ingredient: {
+      id,
+      name,
+      nameEs: str(args.nameEs) || name,
+      category: 'other',
+      kcal: per100g.kcal,
+      protein: per100g.protein,
+      carbs: per100g.carbs,
+      fat: per100g.fat,
+    },
+  })
+  await mutateWorkspace(ctx.userId, {
+    action: 'saveRecipe',
+    recipe: {
+      name,
+      nameEs: str(args.nameEs) || name,
+      category: str(args.category) || 'snack',
+      servings: 1,
+      cuisine: 'mexican',
+      summary: `Packaged serving, ${grams}g`,
+      ingredients: [{ ingredientId: id, grams, note: '1 serving / package' }],
+    },
+  })
+  return {
+    ok: true,
+    mutated: true,
+    summary: `Saved snack “${name}” · ${Math.round(kcal)} kcal per ${grams}g`,
+    data: { id, name, grams, kcal, protein, carbs, fat },
+  }
+}
+
 async function addRecipe(ctx: MeatToolContext, args: Record<string, unknown>): Promise<ToolExecResult> {
   const name = str(args.name)
   if (!name) return { ok: false, summary: 'name is required', error: 'name' }
+  const { extras } = await kitchenPayload(ctx.userId)
   const rawItems = Array.isArray(args.ingredients) ? args.ingredients : []
   if (!rawItems.length) return { ok: false, summary: 'At least one ingredient is required', error: 'ingredients' }
 
@@ -435,7 +581,7 @@ async function addRecipe(ctx: MeatToolContext, args: Record<string, unknown>): P
       missing.push({ input: hint || '(empty)', candidates: [] })
       continue
     }
-    const resolved = resolveIngredient(hint)
+    const resolved = resolveIngredient(hint, extras)
     if (!resolved.ok) {
       missing.push({ input: hint, candidates: resolved.candidates })
       continue
@@ -449,7 +595,7 @@ async function addRecipe(ctx: MeatToolContext, args: Record<string, unknown>): P
   if (missing.length) {
     return {
       ok: false,
-      summary: `Unknown ingredients: ${missing.map((row) => row.input).join(', ')}`,
+      summary: `Unknown ingredients: ${missing.map((row) => row.input).join(', ')}. Use save_packaged_food or lookup_nutrition for snacks.`,
       error: 'ingredients',
       data: { missing },
     }
@@ -482,6 +628,67 @@ async function addRecipe(ctx: MeatToolContext, args: Record<string, unknown>): P
   }
 }
 
+async function updateRecipe(ctx: MeatToolContext, args: Record<string, unknown>): Promise<ToolExecResult> {
+  const hint = str(args.recipe)
+  if (!hint) return { ok: false, summary: 'recipe is required', error: 'recipe' }
+  const { custom, overrides, extras } = await kitchenPayload(ctx.userId)
+  const found = resolveRecipe(hint, custom, overrides)
+  if (!found.ok) {
+    return { ok: false, summary: `Recipe not found: ${hint}`, error: 'recipe', data: { candidates: found.candidates } }
+  }
+  const current = found.recipe
+  let ingredients = current.ingredients
+  if (Array.isArray(args.ingredients)) {
+    const next: { ingredientId: string; grams: number; note?: string }[] = []
+    const missing: string[] = []
+    for (const raw of args.ingredients) {
+      const rec = asRecord(raw)
+      const ingHint = str(rec.ingredient) || str(rec.ingredientId)
+      const grams = num(rec.grams)
+      if (!ingHint || grams == null || grams <= 0) continue
+      const resolved = resolveIngredient(ingHint, extras)
+      if (!resolved.ok) {
+        missing.push(ingHint)
+        continue
+      }
+      next.push({
+        ingredientId: resolved.id,
+        grams,
+        ...(str(rec.note) ? { note: str(rec.note) } : {}),
+      })
+    }
+    if (missing.length) {
+      return { ok: false, summary: `Unknown ingredients: ${missing.join(', ')}`, error: 'ingredients' }
+    }
+    if (!next.length) return { ok: false, summary: 'Need at least one ingredient', error: 'ingredients' }
+    ingredients = next
+  }
+  const cuisineRaw = str(args.cuisine)
+  const cuisine = CUISINES.includes(cuisineRaw as Cuisine) ? (cuisineRaw as Cuisine) : current.cuisine
+  await mutateWorkspace(ctx.userId, {
+    action: 'saveRecipe',
+    recipe: {
+      id: current.id,
+      name: str(args.name) || current.name,
+      nameEs: str(args.nameEs) || current.nameEs,
+      category: str(args.category) || current.category,
+      servings: Math.max(1, num(args.servings) ?? current.servings),
+      ingredients,
+      cuisine,
+      summary: str(args.summary) ?? current.summary,
+      steps: Array.isArray(args.steps)
+        ? args.steps.map((step) => String(step).trim()).filter(Boolean)
+        : current.steps,
+    },
+  })
+  return {
+    ok: true,
+    mutated: true,
+    summary: `Updated recipe “${str(args.name) || current.name}”`,
+    data: { id: current.id },
+  }
+}
+
 async function addFood(ctx: MeatToolContext, args: Record<string, unknown>): Promise<ToolExecResult> {
   const meal = str(args.meal)
   const name = str(args.name)
@@ -490,7 +697,7 @@ async function addFood(ctx: MeatToolContext, args: Record<string, unknown>): Pro
   }
   if (!name) return { ok: false, summary: 'name is required', error: 'name' }
   const date = validDate(str(args.date)) || todayKey()
-  const { member, custom, overrides } = await kitchenPayload(ctx.userId)
+  const { member, custom, overrides, extras } = await kitchenPayload(ctx.userId)
 
   let recipeId: string | undefined
   let servings = num(args.servings)
@@ -513,7 +720,7 @@ async function addFood(ctx: MeatToolContext, args: Record<string, unknown>): Pro
     }
     recipeId = recipe.recipe.id
     servings = servings && servings > 0 ? servings : 1
-    const macros = scaleRecipeMacros(recipe.recipe, servings)
+    const macros = scaleRecipeMacros(recipe.recipe, servings, extras)
     kcal = kcal ?? macros.kcal
     protein = protein ?? macros.protein
     carbs = carbs ?? macros.carbs
@@ -522,15 +729,20 @@ async function addFood(ctx: MeatToolContext, args: Record<string, unknown>): Pro
   } else {
     const ingHint = str(args.ingredient) || name
     const grams = num(args.grams)
-    const resolved = resolveIngredient(ingHint)
+    const resolved = resolveIngredient(ingHint, extras)
     if (resolved.ok && (grams || kcal == null)) {
       const amount = grams && grams > 0 ? grams : 100
-      const macros = macrosForAmount(resolved.id, amount)
+      const ing = findIngredient(resolved.id, extras)
+      const macros = ing
+        ? getIngredient(resolved.id)
+          ? macrosForAmount(resolved.id, amount)
+          : macrosForCustomAmount(ing, amount)
+        : { kcal: 0, protein: 0, carbs: 0, fat: 0 }
       kcal = kcal ?? macros.kcal
       protein = protein ?? macros.protein
       carbs = carbs ?? macros.carbs
       fat = fat ?? macros.fat
-      detail = detail || `${amount}${getIngredient(resolved.id)?.unit === 'ml' ? 'ml' : 'g'}`
+      detail = detail || `${amount}${ing?.unit === 'ml' ? 'ml' : 'g'}`
     }
   }
 
@@ -571,7 +783,8 @@ async function addInventory(ctx: MeatToolContext, args: Record<string, unknown>)
   const grams = num(args.grams)
   if (!hint) return { ok: false, summary: 'ingredient is required', error: 'ingredient' }
   if (grams == null || grams <= 0) return { ok: false, summary: 'grams must be > 0', error: 'grams' }
-  const resolved = resolveIngredient(hint)
+  const { extras } = await kitchenPayload(ctx.userId)
+  const resolved = resolveIngredient(hint, extras)
   if (!resolved.ok) {
     return {
       ok: false,
@@ -587,7 +800,7 @@ async function addInventory(ctx: MeatToolContext, args: Record<string, unknown>)
     grams,
     boughtOn,
   })
-  const label = getIngredient(resolved.id)?.name ?? resolved.id
+  const label = findIngredient(resolved.id, extras)?.name ?? resolved.id
   return {
     ok: true,
     mutated: true,
@@ -599,6 +812,7 @@ async function addInventory(ctx: MeatToolContext, args: Record<string, unknown>)
 async function addShopping(ctx: MeatToolContext, args: Record<string, unknown>): Promise<ToolExecResult> {
   const rawItems = Array.isArray(args.items) ? args.items : []
   if (!rawItems.length) return { ok: false, summary: 'items is required', error: 'items' }
+  const { extras } = await kitchenPayload(ctx.userId)
   const items: { ingredientId: string; grams: number }[] = []
   const missing: string[] = []
   for (const raw of rawItems) {
@@ -606,7 +820,7 @@ async function addShopping(ctx: MeatToolContext, args: Record<string, unknown>):
     const hint = str(rec.ingredient) || str(rec.ingredientId)
     const grams = num(rec.grams)
     if (!hint || grams == null || grams <= 0) continue
-    const resolved = resolveIngredient(hint)
+    const resolved = resolveIngredient(hint, extras)
     if (!resolved.ok) {
       missing.push(hint)
       continue
@@ -710,13 +924,17 @@ async function setWater(ctx: MeatToolContext, args: Record<string, unknown>): Pr
   }
 }
 
-function resolveIngredient(hint: string): { ok: true; id: string } | { ok: false; candidates: { id: string; name: string }[] } {
-  if (getIngredient(hint)) return { ok: true, id: hint }
-  const scored = INGREDIENTS.map((ing) => ({
-    id: ing.id,
-    name: ing.name,
-    score: bestScore(hint, [ing.id, ing.name, ing.nameEs]),
-  }))
+function resolveIngredient(
+  hint: string,
+  extras: import('../../data/types').Ingredient[] = [],
+): { ok: true; id: string } | { ok: false; candidates: { id: string; name: string }[] } {
+  if (findIngredient(hint, extras)) return { ok: true, id: hint }
+  const scored = [...INGREDIENTS, ...extras]
+    .map((ing) => ({
+      id: ing.id,
+      name: ing.name,
+      score: bestScore(hint, [ing.id, ing.name, ing.nameEs]),
+    }))
     .filter((row) => row.score >= 60)
     .sort((a, b) => b.score - a.score)
   if (scored.length === 1 || (scored[0] && scored[0].score >= 90 && (!scored[1] || scored[0].score - scored[1].score >= 15))) {
@@ -752,14 +970,21 @@ function resolveRecipe(
   }
 }
 
-function scaleRecipeMacros(recipe: Recipe, servings: number) {
+function scaleRecipeMacros(
+  recipe: Recipe,
+  servings: number,
+  extras: import('../../data/types').Ingredient[] = [],
+) {
   let kcal = 0
   let protein = 0
   let carbs = 0
   let fat = 0
   for (const line of recipe.ingredients) {
-    if (!getIngredient(line.ingredientId)) continue
-    const macros = macrosForAmount(line.ingredientId, line.grams)
+    const ing = findIngredient(line.ingredientId, extras)
+    if (!ing) continue
+    const macros = getIngredient(line.ingredientId)
+      ? macrosForAmount(line.ingredientId, line.grams)
+      : macrosForCustomAmount(ing, line.grams)
     kcal += macros.kcal
     protein += macros.protein
     carbs += macros.carbs

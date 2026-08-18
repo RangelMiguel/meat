@@ -175,6 +175,7 @@ export interface Kitchen {
   purchaseList: PurchaseItem[]
   customRecipes: Recipe[]
   recipeOverrides: Record<string, Recipe>
+  customIngredients: import('./data/types').Ingredient[]
   weekPlan: WeekPlan
 }
 

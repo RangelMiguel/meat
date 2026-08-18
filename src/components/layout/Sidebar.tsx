@@ -64,7 +64,7 @@ export function Sidebar({
     { id: 'history', label: t(locale, 'navHistory'), icon: CalendarDays, addon: true },
     { id: 'marketplace', label: t(locale, 'navMarketplace'), icon: Store },
     { id: 'settings', label: t(locale, 'navSettings'), icon: Settings },
-    { id: 'ai', label: t(locale, 'navAi'), icon: Sparkles, addon: true },
+    { id: 'ai', label: t(locale, 'navAi'), icon: Sparkles },
   ]
   const visible = items.filter((item) => !item.addon || installedModules.includes(item.id))
 

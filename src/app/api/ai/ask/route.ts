@@ -6,14 +6,14 @@ import { completeWithTools } from '@/lib/ai/complete'
 import { buildMeatContext } from '@/lib/ai/context'
 import { loadPrivateAiSettings, loadPublicAiSettings } from '@/lib/ai/settings'
 import { executeMeatTool, MEAT_TOOLS } from '@/lib/ai/tools'
-import { requireAddon } from '@/lib/modules/access'
 import { loadMeatPrivacy } from '@/lib/ai/privacyBook'
 
 const TOOL_RULES = [
   'You can read and change this kitchen with tools.',
   'When the user asks to add, log, plan, or change something, call the matching tool. Do not pretend you saved it.',
-  'Look up catalog ids with search_ingredients / search_recipes when a name is ambiguous.',
-  'For packaged or branded foods (chips, soda, a bag of Fritos, yogurt cups, etc.) call lookup_nutrition even if they are not in the kitchen snapshot.',
+  'Look up catalog or household snack ids with search_ingredients / search_recipes when a name is ambiguous.',
+  'For packaged snacks (chips, Gansito, Nito, Sabritas, soda, yogurt) call lookup_nutrition, then save_packaged_food so they become a recipe.',
+  'Use add_recipe to create cooked dishes and update_recipe to change existing ones.',
   'After the first turn there is no snapshot — use list_* / search_* / lookup_nutrition if you need current or product numbers.',
   'Do not invent calories for store products when the lookup tool is available. If the tool returns an estimate, say so.',
   'Confirm what was actually saved using the tool result.',
@@ -23,8 +23,7 @@ const TOOL_RULES = [
 export async function POST(req: Request) {
   try {
     const session = await requireSession()
-    const access = await requireHouseholdAccess(session.userId)
-    await requireAddon(access.householdId, 'ai')
+    await requireHouseholdAccess(session.userId)
     await enforceRateLimit({
       key: `ai-ask:${session.userId}`,
       limit: 20,

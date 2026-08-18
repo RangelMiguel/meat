@@ -81,7 +81,7 @@ export function RecipesView({ store, onPrepare }: Props) {
     recipes.find((r) => r.id === selectedId) ??
     list[0]
 
-  const resolved = selected ? resolveRecipeIngredients(selected) : []
+  const resolved = selected ? resolveRecipeIngredients(selected, store.customIngredients) : []
   const overridden = selected ? Boolean(store.recipeOverrides[selected.id]) : false
 
   const handleSaved = (recipe: Recipe) => {

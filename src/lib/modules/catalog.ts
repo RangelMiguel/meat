@@ -35,10 +35,10 @@ export const APP_MODULES: AppModuleDef[] = [
   { id: 'inventory', kind: 'core', view: 'inventory', priceCents: 0 },
   { id: 'purchase', kind: 'core', view: 'purchase', priceCents: 0 },
   { id: 'settings', kind: 'core', view: 'settings', priceCents: 0 },
+  { id: 'ai', kind: 'core', view: 'ai', priceCents: 0 },
   { id: 'week', kind: 'addon', view: 'week', priceCents: 0 },
   { id: 'exercise', kind: 'addon', view: 'exercise', priceCents: 0 },
   { id: 'history', kind: 'addon', view: 'history', priceCents: 0 },
-  { id: 'ai', kind: 'addon', view: 'ai', priceCents: 0 },
 ]
 
 export const ADDON_MODULES = APP_MODULES.filter((m) => m.kind === 'addon')

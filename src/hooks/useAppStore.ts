@@ -759,6 +759,7 @@ export function useAppStore() {
     weekPlan: kitchen?.weekPlan ?? { slots: [] },
     customRecipes: kitchen?.customRecipes ?? [],
     recipeOverrides: kitchen?.recipeOverrides ?? {},
+    customIngredients: kitchen?.customIngredients ?? [],
     theme,
     locale,
     setLocale,

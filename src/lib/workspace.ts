@@ -23,6 +23,7 @@ import {
   parseRecipeOverrides,
   USER_RECIPE_PREFIX,
 } from './recipeLibrary'
+import { parseCustomIngredients, snackIngredientId } from './customIngredients'
 import type { Recipe } from '../data/types'
 import type {
   CaloriePlan,
@@ -187,6 +188,7 @@ function toKitchen(household: LoadedHousehold, kitchen: NonNullable<LoadedHouseh
     ),
     customRecipes: parseRecipes(kitchen.recipesJson),
     recipeOverrides: parseOverrides(kitchen.overridesJson),
+    customIngredients: parseCustomIngredients(safeJson(kitchen.ingredientsJson)),
     weekPlan: parseWeekPlan(safeJson(kitchen.weekPlanJson)),
   }
 }
@@ -435,6 +437,20 @@ const actionSchema = z.discriminatedUnion('action', [
       }),
     ),
   }),
+  z.object({
+    action: z.literal('saveIngredient'),
+    ingredient: z.object({
+      id: z.string().optional(),
+      name: z.string(),
+      nameEs: z.string().optional(),
+      category: z.string().optional(),
+      kcal: z.number(),
+      protein: z.number(),
+      carbs: z.number(),
+      fat: z.number(),
+      unit: z.enum(['g', 'ml']).optional(),
+    }),
+  }),
   z.object({ action: z.literal('saveRecipe'), recipe: recipeSchema }),
   z.object({
     action: z.literal('importRecipes'),
@@ -518,11 +534,16 @@ async function mergeKitchenInto(targetKitchenId: string, sourceKitchenId: string
   const targetFinance = parseFinanceLink(safeJson(target.integrationsJson))
   const sourceFinance = parseFinanceLink(safeJson(source.integrationsJson))
   const finance = targetFinance.token ? targetFinance : sourceFinance
+  const targetIngs = parseCustomIngredients(safeJson(target.ingredientsJson))
+  const sourceIngs = parseCustomIngredients(safeJson(source.ingredientsJson))
+  const ingIds = new Set(targetIngs.map((item) => item.id))
+  const ingredients = [...targetIngs, ...sourceIngs.filter((item) => !ingIds.has(item.id))]
   await prisma.kitchen.update({
     where: { id: target.id },
     data: {
       recipesJson: JSON.stringify(recipes),
       overridesJson: JSON.stringify(overrides),
+      ingredientsJson: JSON.stringify(ingredients),
       integrationsJson: serializeFinanceLink(finance),
     },
   })
@@ -1084,6 +1105,31 @@ export async function mutateWorkspace(userId: string, raw: unknown): Promise<Wor
           recipesJson: JSON.stringify(custom),
           overridesJson: JSON.stringify(overrides),
         },
+      })
+      break
+    }
+    case 'saveIngredient': {
+      const kitchen = household.kitchen!
+      const custom = parseCustomIngredients(safeJson(kitchen.ingredientsJson))
+      const id = body.ingredient.id?.trim() || snackIngredientId(body.ingredient.name)
+      const nextIng = {
+        id,
+        name: body.ingredient.name.trim() || id,
+        nameEs: (body.ingredient.nameEs || body.ingredient.name).trim(),
+        category: (body.ingredient.category as 'other') || 'other',
+        per100g: {
+          kcal: body.ingredient.kcal,
+          protein: body.ingredient.protein,
+          carbs: body.ingredient.carbs,
+          fat: body.ingredient.fat,
+        },
+        unit: body.ingredient.unit ?? 'g',
+      }
+      const idx = custom.findIndex((item) => item.id === id)
+      const next = idx === -1 ? [nextIng, ...custom] : custom.map((item) => (item.id === id ? nextIng : item))
+      await prisma.kitchen.update({
+        where: { id: kitchen.id },
+        data: { ingredientsJson: JSON.stringify(next) },
       })
       break
     }

@@ -2,6 +2,7 @@ import { defaultLocale, type Locale } from '../i18n'
 import { clampGrams } from './calories'
 import { defaultTheme, normalizeThemeId, type ThemeId } from '../themes'
 import { parseCustomRecipes, parseRecipeOverrides } from './recipeLibrary'
+import { parseCustomIngredients } from './customIngredients'
 import { emptyWeekPlan, parseWeekPlan } from './weekPlan'
 import type {
   Account,
@@ -241,6 +242,7 @@ function parseKitchens(raw: unknown): Kitchen[] {
         purchaseList: parsePurchaseList(rec.purchaseList),
         customRecipes: parseCustomRecipes(rec.customRecipes),
         recipeOverrides: parseRecipeOverrides(rec.recipeOverrides),
+        customIngredients: parseCustomIngredients(rec.customIngredients),
         weekPlan: rec.weekPlan ? parseWeekPlan(rec.weekPlan) : emptyWeekPlan(),
       },
     ]
