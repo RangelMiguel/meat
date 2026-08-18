@@ -39,7 +39,7 @@ export async function lookupNutrition(
   let matches: NutritionHit[] = []
   if (search) {
     try {
-      matches = await searchOpenFoodFacts(search, barcode ? 3 : 5)
+      matches = await searchOpenFoodFacts(search, barcode ? 4 : 8)
     } catch {
       matches = []
     }

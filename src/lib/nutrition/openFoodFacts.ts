@@ -1,7 +1,7 @@
-import type { MacroSet, NutritionHit } from './types'
+import type { ExtraNutrients, MacroSet, NutritionHit } from './types'
 
 const OFF_BASE = 'https://world.openfoodfacts.org'
-const UA = 'meat-nutrition/1.0 (household calorie log)'
+const UA = 'MeatKitchen/1.0 (https://github.com/RangelMiguel/meat)'
 
 function round1(n: number): number {
   return Math.round(n * 10) / 10
@@ -36,6 +36,9 @@ type OffProduct = {
   serving_quantity?: number | string
   product_quantity?: number | string
   product_quantity_unit?: string
+  countries?: string
+  nutriscore_grade?: string
+  nutrition_grade_fr?: string
   nutriments?: Record<string, unknown>
 }
 
@@ -86,18 +89,63 @@ function fromProduct(product: OffProduct): NutritionHit | null {
         }
       : undefined
 
+  const extras100g = extrasFrom(n, '100g')
+  const extrasServing = extrasFrom(n, 'serving')
+  const nutriscore = (product.nutriscore_grade || product.nutrition_grade_fr || '').trim().toLowerCase()
+  const barcode = product.code || undefined
+
   return {
     name,
+    nameEs: product.product_name_es?.trim() || undefined,
     brand: product.brands?.split(',')[0]?.trim() || undefined,
-    barcode: product.code || undefined,
+    barcode,
     servingLabel:
       product.serving_size?.trim() ||
       (servingQty > 0 ? `${servingQty}g` : per100.kcal === serving.kcal ? '100g' : undefined),
     quantity: product.quantity?.trim() || undefined,
+    countries: product.countries?.trim() || undefined,
+    url: barcode ? `${OFF_BASE}/product/${encodeURIComponent(barcode)}` : undefined,
+    nutriscore: nutriscore || undefined,
     serving,
     per100g: per100.kcal > 0 ? per100 : undefined,
     pack,
+    extras100g,
+    extrasServing,
     source: 'openfoodfacts',
+  }
+}
+
+function extrasFrom(n: Record<string, unknown>, suffix: '100g' | 'serving'): ExtraNutrients | undefined {
+  const sugars = num(n[`sugars_${suffix}`] ?? (suffix === '100g' ? n.sugars : undefined))
+  const fiber = num(n[`fiber_${suffix}`] ?? n[`fibre_${suffix}`])
+  const salt = num(n[`salt_${suffix}`])
+  const saturatedFat = num(n[`saturated-fat_${suffix}`])
+  const sodiumG = num(n[`sodium_${suffix}`])
+  if (sugars <= 0 && fiber <= 0 && salt <= 0 && saturatedFat <= 0 && sodiumG <= 0) return undefined
+  return {
+    ...(sugars > 0 ? { sugars: round1(sugars) } : {}),
+    ...(fiber > 0 ? { fiber: round1(fiber) } : {}),
+    ...(salt > 0 ? { salt: round1(salt) } : {}),
+    ...(saturatedFat > 0 ? { saturatedFat: round1(saturatedFat) } : {}),
+    ...(sodiumG > 0 ? { sodiumMg: Math.round(sodiumG * 1000) } : {}),
+  }
+}
+
+export function formatOpenFoodFactsProduct(hit: NutritionHit) {
+  return {
+    name: hit.name,
+    nameEs: hit.nameEs,
+    brand: hit.brand,
+    barcode: hit.barcode,
+    countries: hit.countries,
+    quantity: hit.quantity,
+    servingLabel: hit.servingLabel,
+    serving: { ...hit.serving, ...hit.extrasServing },
+    per100g: hit.per100g ? { ...hit.per100g, ...hit.extras100g } : undefined,
+    pack: hit.pack,
+    nutriscore: hit.nutriscore,
+    url: hit.url,
+    source: 'openfoodfacts' as const,
   }
 }
 
@@ -123,13 +171,35 @@ export async function fetchProductByBarcode(barcode: string): Promise<NutritionH
 export async function searchOpenFoodFacts(query: string, limit = 5): Promise<NutritionHit[]> {
   const q = query.trim()
   if (q.length < 2) return []
-  const url = `${OFF_BASE}/cgi/search.pl?search_terms=${encodeURIComponent(q)}&search_simple=1&action=process&json=1&page_size=${Math.min(Math.max(limit, 1), 8)}`
-  const data = (await offGet(url)) as { products?: OffProduct[] }
+  const pageSize = Math.min(Math.max(limit * 3, 8), 24)
+  const params = new URLSearchParams({
+    search_terms: q,
+    search_simple: '1',
+    action: 'process',
+    json: '1',
+    page_size: String(pageSize),
+    sort_by: 'unique_scans_n',
+  })
+  const data = (await offGet(`${OFF_BASE}/cgi/search.pl?${params.toString()}`)) as { products?: OffProduct[] }
   const hits: NutritionHit[] = []
+  const seen = new Set<string>()
   for (const product of data.products ?? []) {
     const hit = fromProduct(product)
-    if (hit) hits.push(hit)
+    if (!hit) continue
+    const key = hit.barcode || `${fold(hit.brand)}|${fold(hit.name)}`
+    if (seen.has(key)) continue
+    seen.add(key)
+    hits.push(hit)
     if (hits.length >= limit) break
   }
   return hits
+}
+
+function fold(value?: string): string {
+  return (value || '')
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/\p{M}/gu, '')
+    .replace(/[^a-z0-9]+/g, ' ')
+    .trim()
 }

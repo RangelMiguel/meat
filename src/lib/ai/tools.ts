@@ -12,6 +12,7 @@ import {
 import { findMergedRecipe, mergeRecipeLibrary, parseCustomRecipes, parseRecipeOverrides } from '../recipeLibrary'
 import { parseWeekPlan } from '../weekPlan'
 import { isModuleInstalled } from '../modules/access'
+import { formatOpenFoodFactsProduct, fetchProductByBarcode, searchOpenFoodFacts } from '../nutrition/openFoodFacts'
 import { lookupNutrition } from '../nutrition/lookup'
 import { mutateWorkspace } from '../workspace'
 import type { ToolCallRequest, ToolExecResult, ToolSpec } from './complete'
@@ -73,9 +74,23 @@ export const MEAT_TOOLS: ToolSpec[] = [
     parameters: { type: 'object', properties: {}, additionalProperties: false },
   },
   {
+    name: 'search_open_food_facts',
+    description:
+      'Search the Open Food Facts product database for official nutrition facts (calories, protein, carbs, fat, sugars, fiber, salt) per serving, per 100g, and per package. Use this first for packaged or branded foods (chips, Gansito, Nito, Sabritas, soda, yogurt). Returns several matches — pick the closest brand and size. Does not estimate.',
+    parameters: {
+      type: 'object',
+      properties: {
+        query: { type: 'string', description: 'Product name and brand, e.g. Gansito Marinela or Fritos original' },
+        barcode: { type: 'string', description: 'EAN/UPC barcode if the user has one' },
+        limit: { type: 'number', description: 'Max matches, default 6' },
+      },
+      additionalProperties: false,
+    },
+  },
+  {
     name: 'lookup_nutrition',
     description:
-      'Look up calories and macros for a packaged or branded food (chips, soda, yogurt, a bag of Fritos, etc.) even if it is not in the kitchen catalog. Always use this before guessing calories for store products. Returns serving, 100g, and whole-package values when available.',
+      'Look up calories for a packaged food using Open Food Facts first, then an AI estimate if the database has no match. Prefer search_open_food_facts when you need official label facts or several product options.',
     parameters: {
       type: 'object',
       properties: {
@@ -88,7 +103,7 @@ export const MEAT_TOOLS: ToolSpec[] = [
   {
     name: 'save_packaged_food',
     description:
-      'Save a packaged snack or store product (chips, Gansito, Nito, soda, yogurt, etc.) as a household ingredient and a 1-serving recipe so it can be logged later. Use lookup_nutrition first when calories are unknown.',
+      'Save a packaged snack or store product (chips, Gansito, Nito, soda, yogurt, etc.) as a household ingredient and a 1-serving recipe so it can be logged later. Use search_open_food_facts first when calories are unknown.',
     parameters: {
       type: 'object',
       properties: {
@@ -110,7 +125,7 @@ export const MEAT_TOOLS: ToolSpec[] = [
   {
     name: 'add_recipe',
     description:
-      'Create a household recipe. Use catalog ingredient ids, household snack ids (snack-…), or names. For packaged snacks, prefer save_packaged_food or lookup_nutrition first.',
+      'Create a household recipe. Use catalog ingredient ids, household snack ids (snack-…), or names. For packaged snacks, prefer save_packaged_food or search_open_food_facts first.',
     parameters: {
       type: 'object',
       properties: {
@@ -305,6 +320,8 @@ export async function executeMeatTool(ctx: MeatToolContext, call: ToolCallReques
       return listShopping(ctx)
     case 'list_today_log':
       return listToday(ctx)
+    case 'search_open_food_facts':
+      return searchOpenFoodFactsTool(str(args.query), str(args.barcode), num(args.limit))
     case 'lookup_nutrition':
       return lookupProduct(ctx, str(args.query), str(args.barcode))
     case 'save_packaged_food':
@@ -330,6 +347,57 @@ export async function executeMeatTool(ctx: MeatToolContext, call: ToolCallReques
   }
 }
 
+async function searchOpenFoodFactsTool(
+  query?: string,
+  barcode?: string,
+  limit?: number,
+): Promise<ToolExecResult> {
+  if (!query && !barcode) return { ok: false, summary: 'query or barcode is required', error: 'query' }
+  const take = Math.min(Math.max(limit ?? 6, 1), 10)
+  const products = []
+  if (barcode) {
+    try {
+      const exact = await fetchProductByBarcode(barcode)
+      if (exact) products.push(formatOpenFoodFactsProduct(exact))
+    } catch {
+      /* fall through to name search */
+    }
+  }
+  const search = query || (!products.length ? barcode : undefined)
+  if (search && products.length < take) {
+    try {
+      const matches = await searchOpenFoodFacts(search, take)
+      const seen = new Set(products.map((row) => row.barcode).filter(Boolean))
+      for (const hit of matches) {
+        if (hit.barcode && seen.has(hit.barcode)) continue
+        products.push(formatOpenFoodFactsProduct(hit))
+        if (products.length >= take) break
+      }
+    } catch (err) {
+      if (!products.length) {
+        return {
+          ok: false,
+          summary: `Open Food Facts search failed: ${err instanceof Error ? err.message : String(err)}`,
+          error: 'off',
+        }
+      }
+    }
+  }
+  if (!products.length) {
+    return {
+      ok: false,
+      summary: `No Open Food Facts match for ${query || barcode}. Try a brand + product name, or a barcode.`,
+      error: 'not_found',
+    }
+  }
+  const first = products[0]
+  return {
+    ok: true,
+    summary: `Open Food Facts: ${products.length} product(s). Closest: ${first.brand ? `${first.brand} ` : ''}${first.name} · ${first.serving.kcal} kcal per ${first.servingLabel || 'serving'}`,
+    data: { source: 'openfoodfacts', products },
+  }
+}
+
 async function lookupProduct(
   ctx: MeatToolContext,
   query?: string,
@@ -350,22 +418,10 @@ async function lookupProduct(
     ok: true,
     summary: `${hit.name}: ${hit.serving.kcal} kcal per ${hit.servingLabel || 'serving'}${extra}`,
     data: {
-      name: hit.name,
-      brand: hit.brand,
-      barcode: hit.barcode,
+      ...formatOpenFoodFactsProduct(hit),
       estimated: Boolean(hit.estimated),
       source: hit.source,
-      servingLabel: hit.servingLabel,
-      serving: hit.serving,
-      per100g: hit.per100g,
-      pack: hit.pack,
-      matches: result.matches.slice(0, 4).map((row) => ({
-        name: row.name,
-        brand: row.brand,
-        servingLabel: row.servingLabel,
-        serving: row.serving,
-        pack: row.pack,
-      })),
+      matches: result.matches.slice(0, 4).map((row) => formatOpenFoodFactsProduct(row)),
     },
   }
 }
@@ -595,7 +651,7 @@ async function addRecipe(ctx: MeatToolContext, args: Record<string, unknown>): P
   if (missing.length) {
     return {
       ok: false,
-      summary: `Unknown ingredients: ${missing.map((row) => row.input).join(', ')}. Use save_packaged_food or lookup_nutrition for snacks.`,
+      summary: `Unknown ingredients: ${missing.map((row) => row.input).join(', ')}. Use save_packaged_food or search_open_food_facts for snacks.`,
       error: 'ingredients',
       data: { missing },
     }
