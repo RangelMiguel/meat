@@ -234,6 +234,13 @@ export function LogFoodForm({
           </button>
         )}
       </div>
+      <p className="field-hint off-source-note">
+        {t(locale, 'offSourceNoteBefore')}{' '}
+        <a href="https://world.openfoodfacts.org/" target="_blank" rel="noreferrer">
+          Open Food Facts
+        </a>{' '}
+        {t(locale, 'offSourceNoteAfter')}
+      </p>
     </form>
   )
 }

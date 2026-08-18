@@ -171,6 +171,14 @@ export function AiView({ locale, onGoSettings, onMutated }: Props) {
           <p className="field-hint">{t(locale, 'aiFooterHint')}</p>
         </div>
       )}
+
+      <p className="field-hint off-source-note">
+        {t(locale, 'offSourceNoteBefore')}{' '}
+        <a href="https://world.openfoodfacts.org/" target="_blank" rel="noreferrer">
+          Open Food Facts
+        </a>{' '}
+        {t(locale, 'offSourceNoteAfter')}
+      </p>
     </div>
   )
 }
