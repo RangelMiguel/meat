@@ -168,7 +168,6 @@ export function AiView({ locale, onGoSettings, onMutated }: Props) {
               {t(locale, 'aiSend')}
             </button>
           </div>
-          <p className="field-hint">{t(locale, 'aiFooterHint')}</p>
         </div>
       )}
 

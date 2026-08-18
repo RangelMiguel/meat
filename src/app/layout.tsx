@@ -15,14 +15,14 @@ const display = Fraunces({
 })
 
 export const metadata: Metadata = {
-  title: 'meat',
+  title: 'Meat',
   description: 'Family calorie tracker',
-  applicationName: 'meat',
+  applicationName: 'Meat',
   manifest: '/manifest.webmanifest',
   appleWebApp: {
     capable: true,
     statusBarStyle: 'black-translucent',
-    title: 'meat',
+    title: 'Meat',
   },
   icons: {
     icon: [

@@ -36,7 +36,7 @@ export async function buildMeatContext(userId: string): Promise<string> {
   const plan = parsePlan(member.planJson)
   const privacy = await loadMeatPrivacy(userId)
   const lines: string[] = [
-    'App: meat (meals, calories, kitchen)',
+    'App: Meat (meals, calories, kitchen)',
     'Person: You',
     `Today: ${today}`,
     'Personal names, emails, phones, and keys are omitted.',

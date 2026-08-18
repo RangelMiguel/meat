@@ -1,6 +1,6 @@
 {
-  "name": "meat",
-  "short_name": "meat",
+  "name": "Meat",
+  "short_name": "Meat",
   "description": "Family calorie tracker with passkeys",
   "start_url": "/",
   "scope": "/",

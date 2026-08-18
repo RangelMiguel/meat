@@ -3,6 +3,7 @@ import {
   BookOpen,
   CalendarDays,
   CalendarRange,
+  CircleHelp,
   ClipboardList,
   Dumbbell,
   Flame,
@@ -65,6 +66,7 @@ export function Sidebar({
     { id: 'marketplace', label: t(locale, 'navMarketplace'), icon: Store },
     { id: 'settings', label: t(locale, 'navSettings'), icon: Settings },
     { id: 'ai', label: t(locale, 'navAi'), icon: Sparkles },
+    { id: 'help', label: t(locale, 'navHelp'), icon: CircleHelp },
   ]
   const visible = items.filter((item) => !item.addon || installedModules.includes(item.id))
 
@@ -75,7 +77,7 @@ export function Sidebar({
           <span>✦</span>
         </div>
         <div className="sidebar-brand-copy">
-          <div className="font-display">meat</div>
+          <div className="font-display">{t(locale, 'brandName')}</div>
           <div>
             {householdName || t(locale, 'brandTagline')}
             {userName ? ` · ${userName}` : ''}

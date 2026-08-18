@@ -190,7 +190,7 @@ export function useAppStore() {
     })
     document.documentElement.setAttribute('data-theme', theme)
     document.documentElement.lang = locale
-    document.title = locale === 'es' ? 'meat · control de calorías' : 'meat · calorie tracker'
+    document.title = locale === 'es' ? 'Meat · control de calorías' : 'Meat · calorie tracker'
   }, [status, workspace, theme, locale])
 
   const account: Account | null = workspace?.account ?? null

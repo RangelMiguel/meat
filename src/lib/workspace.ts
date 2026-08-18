@@ -1058,7 +1058,7 @@ export async function mutateWorkspace(userId: string, raw: unknown): Promise<Wor
           token: finance.token,
           amount,
           date: boughtOn,
-          description: note || `meat grocery shop (${items.length})`,
+          description: note || `Meat grocery shop (${items.length})`,
           items,
           clientMutationId: `meat-${kitchen.id}-${boughtOn}-${Date.now()}`,
         })

@@ -93,9 +93,9 @@ export function AppShell({
             >
               {open ? <X size={20} /> : <Menu size={20} />}
             </button>
-            <div className="font-display topbar-title-mobile">meat</div>
+            <div className="font-display topbar-title-mobile">{t(locale, 'brandName')}</div>
             <div className="topbar-crumb">
-              <span>meat</span>
+              <span>{t(locale, 'brandName')}</span>
               {householdName ? (
                 <>
                   <span className="topbar-sep">/</span>

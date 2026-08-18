@@ -12,6 +12,7 @@ import { RecipesView } from './components/RecipesView'
 import { SettingsView } from './components/SettingsView'
 import { AiView } from './components/AiView'
 import { MarketplaceView } from './components/MarketplaceView'
+import { HelpView } from './components/HelpView'
 import { WeekPlanView } from './components/WeekPlanView'
 import { TodayView } from './components/TodayView'
 import { PwaProvider } from './components/PwaProvider'
@@ -84,7 +85,7 @@ export default function App() {
           <div className="card auth-card">
             <div className="card-header">
               <div>
-                <h2>meat</h2>
+                <h2>{t(locale, 'brandName')}</h2>
                 <p className="sub">{t(locale, 'loadingSession')}</p>
               </div>
             </div>
@@ -208,6 +209,7 @@ export default function App() {
                 onMutated={() => void store.reloadWorkspace()}
               />
             )}
+            {view === 'help' && <HelpView locale={locale} onGo={goTo} />}
           </>
         )}
         </>

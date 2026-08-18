@@ -53,7 +53,7 @@ export async function POST(req: Request) {
     const firstTurn = userTurns <= 1
     const system = firstTurn
       ? [
-          'You are a nutrition and kitchen assistant inside the meat app.',
+          'You are a nutrition and kitchen assistant inside the Meat app.',
           'Answer from the snapshot below plus live tool results.',
           'The user consented to send this snapshot to their own configured AI provider.',
           'Later turns in this chat will not repeat the snapshot.',
@@ -63,7 +63,7 @@ export async function POST(req: Request) {
           await buildMeatContext(session.userId),
         ].join('\n')
       : [
-          'You are a nutrition and kitchen assistant inside the meat app.',
+          'You are a nutrition and kitchen assistant inside the Meat app.',
           'The kitchen snapshot was sent only in the first message of this chat.',
           TOOL_RULES,
         ].join('\n')
