@@ -77,7 +77,7 @@ const en: HelpContent = {
           summary: 'Shared kitchen, separate calorie plans.',
           paragraphs: [
             'You can stay solo or create a household. Everyone in the household shares recipes, inventory, and the shopping list.',
-            'Each person still has their own plan, daily log, water, and exercise.',
+            'Each person still has their own plan, daily log, weight, water, and exercise.',
             'Invite others from Settings with a link. They join with their own passkey.',
           ],
           view: 'settings',
@@ -96,7 +96,7 @@ const en: HelpContent = {
           summary: 'Food log, water, and remaining calories for the day.',
           view: 'today',
           paragraphs: [
-            'Today is the landing screen. It shows what you have eaten against your plan, plus water and exercise if those are in use.',
+            'Today is the landing screen. It shows what you have eaten against your plan, plus water, a weigh-in, and exercise if those are in use.',
             'Log a catalog recipe, a custom snack, or type calories by hand. You can also scan a package barcode to fill macros.',
             'When you cook from a recipe, Meat can deduct ingredients from inventory and split the meal across people.',
           ],
@@ -114,6 +114,21 @@ const en: HelpContent = {
             'The plan is personal. Enter age, height, weight, and activity, then choose a pace: lose weight fast, lose weight, maintain, gain weight, or gain weight fast.',
             'Meat turns that into daily calories and protein / carbs / fat. You can edit someone else’s plan if you are in the same household.',
             'After you save a plan, you can pick meals for the week if that module is installed.',
+          ],
+        },
+        {
+          id: 'progress',
+          title: 'Progress',
+          summary: 'Weigh-ins, a trend graph, and when to change calories.',
+          view: 'progress',
+          paragraphs: [
+            'Log your weight once a day. The same morning scale is best. Logging again on that day updates the number.',
+            'The graph shows the logged trend against the weekly change in your plan. Day-to-day swings of 0.5–1 kg from water and salt are normal.',
+            'After about two weeks, Meat can tell if you are losing or gaining too slowly and offer a lower or higher calorie target. If your current weight is well off the weight stored in the plan, it will offer to recalculate BMR and intake.',
+          ],
+          tips: [
+            'The first time you save a plan, that starting weight is logged automatically.',
+            'Applying a recommendation updates that person’s plan. Food history stays.',
           ],
         },
         {
@@ -163,7 +178,7 @@ const en: HelpContent = {
           summary: 'Install or remove Week, Exercise, and History.',
           view: 'marketplace',
           paragraphs: [
-            'Core screens (Today, Plan, Recipes, Inventory, Purchase, Settings, AI, Help) are always there.',
+            'Core screens (Today, Plan, Progress, Recipes, Inventory, Purchase, Settings, AI, Help) are always there.',
             'Week planner, Exercise, and History are add-ons. Install them here so they appear in the menu.',
             'Removing a module hides it. The data stays, so installing it again brings the screen back.',
           ],
@@ -296,7 +311,7 @@ const es: HelpContent = {
           summary: 'Cocina compartida, planes de calorías por persona.',
           paragraphs: [
             'Puedes seguir solo o crear un hogar. Quienes están en el hogar comparten recetas, inventario y la lista de compras.',
-            'Cada persona sigue teniendo su plan, registro del día, agua y ejercicio.',
+            'Cada persona sigue teniendo su plan, registro del día, peso, agua y ejercicio.',
             'Invita desde Ajustes con un enlace. Entran con su propia llave de acceso.',
           ],
           view: 'settings',
@@ -315,7 +330,7 @@ const es: HelpContent = {
           summary: 'Registro, agua y calorías que quedan en el día.',
           view: 'today',
           paragraphs: [
-            'Hoy es la pantalla de entrada. Muestra lo que comiste frente a tu plan, más agua y ejercicio si los usas.',
+            'Hoy es la pantalla de entrada. Muestra lo que comiste frente a tu plan, más agua, el peso del día y ejercicio si los usas.',
             'Registra una receta del catálogo, un snack o escribe las calorías a mano. También puedes escanear el código de barras del paquete.',
             'Al cocinar, Meat puede descontar ingredientes del inventario y repartir el platillo entre personas.',
           ],
@@ -333,6 +348,21 @@ const es: HelpContent = {
             'El plan es personal. Pon edad, estatura, peso y actividad, y elige un ritmo: bajar rápido, bajar, mantener, subir o subir rápido.',
             'Meat lo convierte en calorías del día y proteína / carbos / grasa. Puedes editar el plan de otra persona del mismo hogar.',
             'Después de guardar, puedes elegir comidas de la semana si ese módulo está instalado.',
+          ],
+        },
+        {
+          id: 'progress',
+          title: 'Progreso',
+          summary: 'Pesajes, gráfica de tendencia y cuándo cambiar las calorías.',
+          view: 'progress',
+          paragraphs: [
+            'Registra el peso una vez al día. Mejor a la misma hora, por la mañana. Si vuelves a guardar ese día, se actualiza el número.',
+            'La gráfica compara la tendencia registrada con el cambio semanal de tu plan. Subidas y bajadas de 0.5–1 kg por agua y sal son normales.',
+            'Tras unas dos semanas, Meat puede ver si bajas o subes demasiado lento y ofrecer una meta de calorías más baja o más alta. Si tu peso actual se alejó del peso guardado en el plan, ofrece recalcular el BMR y las calorías.',
+          ],
+          tips: [
+            'La primera vez que guardas un plan, ese peso inicial se registra solo.',
+            'Aplicar una recomendación actualiza el plan de esa persona. El historial de comida se queda.',
           ],
         },
         {
@@ -382,7 +412,7 @@ const es: HelpContent = {
           summary: 'Instala o quita Semana, Ejercicio e Historial.',
           view: 'marketplace',
           paragraphs: [
-            'Las pantallas base (Hoy, Plan, Recetas, Inventario, Compras, Ajustes, IA, Ayuda) siempre están.',
+            'Las pantallas base (Hoy, Plan, Progreso, Recetas, Inventario, Compras, Ajustes, IA, Ayuda) siempre están.',
             'Semana, Ejercicio e Historial son extras. Instálalos aquí para que aparezcan en el menú.',
             'Quitar un módulo lo oculta. Los datos se quedan, así que al instalarlo otra vez vuelve la pantalla.',
           ],

@@ -17,6 +17,7 @@ import type {
   LegacyWorkspace,
   Member,
   PurchaseItem,
+  WeightEntry,
 } from '../types'
 
 const KEY = 'meat-app-v2'
@@ -129,6 +130,25 @@ function parseExercises(raw: unknown): ExerciseEntry[] {
   })
 }
 
+function parseWeights(raw: unknown): WeightEntry[] {
+  if (!Array.isArray(raw)) return []
+  return raw.flatMap((item) => {
+    if (!item || typeof item !== 'object') return []
+    const rec = item as Partial<WeightEntry>
+    if (typeof rec.id !== 'string' || typeof rec.date !== 'string') return []
+    const kg = Number(rec.kg)
+    if (!Number.isFinite(kg) || kg <= 0) return []
+    return [
+      {
+        id: rec.id,
+        date: rec.date,
+        kg: Math.round(kg * 10) / 10,
+        createdAt: typeof rec.createdAt === 'string' ? rec.createdAt : rec.date,
+      },
+    ]
+  })
+}
+
 function parseWater(raw: unknown): Record<string, number> {
   if (!raw || typeof raw !== 'object') return {}
   const out: Record<string, number> = {}
@@ -221,6 +241,7 @@ function parseMembers(raw: unknown): Member[] {
         plan: (rec.plan as CaloriePlan | null) ?? null,
         entries: parseEntries(rec.entries),
         exercises: parseExercises(rec.exercises),
+        weights: parseWeights(rec.weights),
         water: parseWater(rec.water),
       },
     ]

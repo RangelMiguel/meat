@@ -14,6 +14,7 @@ export type MealType = 'Breakfast' | 'Lunch' | 'Dinner' | 'Snack'
 export type View =
   | 'today'
   | 'plan'
+  | 'progress'
   | 'week'
   | 'history'
   | 'recipes'
@@ -98,6 +99,13 @@ export interface ExerciseEntry {
   createdAt: string
 }
 
+export interface WeightEntry {
+  id: string
+  date: string
+  kg: number
+  createdAt: string
+}
+
 export interface FoodEntry {
   id: string
   date: string // YYYY-MM-DD
@@ -164,6 +172,7 @@ export interface Member {
   plan: CaloriePlan | null
   entries: FoodEntry[]
   exercises: ExerciseEntry[]
+  weights: WeightEntry[]
   water: Record<string, number>
 }
 

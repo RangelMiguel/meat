@@ -537,6 +537,20 @@ export function useAppStore() {
     [mutate],
   )
 
+  const addWeight = useCallback(
+    (input: { kg: number; date?: string; memberId?: string }) => {
+      void mutate({ action: 'addWeight', ...input })
+    },
+    [mutate],
+  )
+
+  const removeWeight = useCallback(
+    (id: string) => {
+      void mutate({ action: 'removeWeight', id })
+    },
+    [mutate],
+  )
+
   const addInventoryItem = useCallback(
     (item: Pick<InventoryItem, 'ingredientId' | 'boughtOn' | 'grams'>) => {
       void mutate({ action: 'addInventoryItem', ...item })
@@ -667,6 +681,7 @@ export function useAppStore() {
     for (const member of household) {
       for (const entry of member.entries) dates.add(entry.date)
       for (const item of member.exercises ?? []) dates.add(item.date)
+      for (const item of member.weights ?? []) dates.add(item.date)
       for (const [date, glasses] of Object.entries(member.water)) {
         if ((glasses ?? 0) > 0) dates.add(date)
       }
@@ -791,6 +806,8 @@ export function useAppStore() {
     removeEntry,
     addExercise,
     removeExercise,
+    addWeight,
+    removeWeight,
     setWater,
     gramsOnHand,
     addInventoryItem,

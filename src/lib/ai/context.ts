@@ -28,6 +28,7 @@ export async function buildMeatContext(userId: string): Promise<string> {
       household: { include: { kitchen: { include: { inventory: true, purchases: true } } } },
       entries: { orderBy: { createdAt: 'desc' }, take: 40 },
       exercises: { orderBy: { createdAt: 'desc' }, take: 15 },
+      weightLogs: { orderBy: { date: 'desc' }, take: 20 },
     },
   })
   if (!member) return 'No member profile found.'
@@ -63,6 +64,15 @@ export async function buildMeatContext(userId: string): Promise<string> {
   if (todayEx.length) {
     const burned = todayEx.reduce((s, e) => s + e.kcal, 0)
     lines.push(`Today exercise: ${burned} kcal burned`)
+  }
+
+  if (member.weightLogs.length) {
+    const latest = member.weightLogs[0]
+    lines.push(`Latest weight: ${latest.kg} kg on ${latest.date}`)
+    lines.push('Recent weigh-ins:')
+    for (const log of member.weightLogs.slice(0, 12)) {
+      lines.push(`- ${log.date}: ${log.kg} kg`)
+    }
   }
 
   const kitchen = member.household.kitchen

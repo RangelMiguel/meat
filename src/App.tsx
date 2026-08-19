@@ -7,6 +7,7 @@ import { CookView } from './components/CookView'
 import { HistoryView } from './components/HistoryView'
 import { InventoryView } from './components/InventoryView'
 import { PlanForm } from './components/PlanForm'
+import { ProgressView } from './components/ProgressView'
 import { PurchaseView } from './components/PurchaseView'
 import { RecipesView } from './components/RecipesView'
 import { SettingsView } from './components/SettingsView'
@@ -107,6 +108,7 @@ export default function App() {
               <TodayView
                 store={store}
                 onGoPlan={() => goTo('plan')}
+                onGoProgress={() => goTo('progress')}
                 prepareRecipeId={prepareRecipeId}
                 onPrepareHandled={() => setPrepareRecipeId(null)}
                 onStartCooking={(session) => setCookSession(session)}
@@ -169,6 +171,14 @@ export default function App() {
                   </div>
                 )}
               </div>
+            )}
+            {view === 'progress' && (
+              <ProgressView
+                store={store}
+                memberId={planMember?.id ?? ''}
+                onSelectMember={setPlanMemberId}
+                onNeedPlan={() => goTo('plan')}
+              />
             )}
             {view === 'week' && (
               <WeekPlanView

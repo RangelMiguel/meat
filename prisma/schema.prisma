@@ -111,9 +111,10 @@ model Member {
 
   household Household        @relation(fields: [householdId], references: [id], onDelete: Cascade)
   user      User?            @relation(fields: [userId], references: [id], onDelete: SetNull)
-  entries   FoodEntry[]
-  exercises ExerciseEntry[]
-  waterLogs WaterLog[]
+  entries    FoodEntry[]
+  exercises  ExerciseEntry[]
+  waterLogs  WaterLog[]
+  weightLogs WeightLog[]
 
   @@index([householdId])
   @@index([userId])
@@ -180,6 +181,19 @@ model WaterLog {
   member Member @relation(fields: [memberId], references: [id], onDelete: Cascade)
 
   @@unique([memberId, date])
+}
+
+model WeightLog {
+  id        String   @id @default(cuid())
+  memberId  String
+  date      String
+  kg        Float
+  createdAt DateTime @default(now())
+
+  member Member @relation(fields: [memberId], references: [id], onDelete: Cascade)
+
+  @@unique([memberId, date])
+  @@index([memberId, date])
 }
 
 model InventoryItem {

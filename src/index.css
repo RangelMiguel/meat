@@ -3933,3 +3933,147 @@ html[data-spotlight='on'] body::after {
   gap: 0.3rem;
   font-size: 0.78rem;
 }
+
+/* weight progress */
+.weight-stats {
+  margin-bottom: 1rem;
+}
+
+.weight-chart-wrap {
+  margin: 0.35rem 0 0.85rem;
+}
+
+.weight-chart svg {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+.weight-chart-grid {
+  stroke: var(--border);
+  stroke-width: 1;
+}
+
+.weight-chart-label {
+  fill: var(--text-muted);
+  font-size: 11px;
+  font-family: var(--font-mono);
+}
+
+.weight-chart-line {
+  stroke: var(--primary);
+  stroke-width: 2.6;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.weight-chart-expected {
+  stroke: var(--accent);
+  stroke-width: 1.6;
+  stroke-dasharray: 5 5;
+  stroke-linecap: round;
+}
+
+.weight-chart-dot {
+  fill: var(--bg-card);
+  stroke: var(--primary);
+  stroke-width: 2;
+}
+
+.weight-chart-dot.is-active {
+  fill: var(--primary);
+}
+
+.weight-chart-tip {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin-top: 0.35rem;
+}
+
+.weight-chart-tip strong {
+  font-family: var(--font-display);
+  font-size: 1.15rem;
+}
+
+.weight-chart-tip span {
+  color: var(--text-muted);
+  font-size: 0.8rem;
+}
+
+.weight-chart-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.85rem;
+  margin: 0.45rem 0 0;
+  font-size: 0.74rem;
+  color: var(--text-muted);
+}
+
+.weight-chart-key::before {
+  content: '';
+  display: inline-block;
+  width: 0.85rem;
+  height: 0.18rem;
+  margin-right: 0.35rem;
+  vertical-align: middle;
+  border-radius: 99px;
+  background: var(--primary);
+}
+
+.weight-chart-key.is-expected::before {
+  background: var(--accent);
+  height: 0;
+  border-top: 2px dashed var(--accent);
+}
+
+.weight-form {
+  display: grid;
+  gap: 0.65rem;
+}
+
+.weight-form.is-compact .form-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 0.55rem;
+  align-items: end;
+}
+
+.weight-form-action {
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+}
+
+.weight-form-spacer {
+  visibility: hidden;
+}
+
+.today-weight-row + .today-weight-row {
+  margin-top: 0.85rem;
+  padding-top: 0.75rem;
+  border-top: var(--border-width) solid var(--border);
+}
+
+.today-weight-row strong {
+  display: block;
+  margin-bottom: 0.35rem;
+  font-size: 0.82rem;
+}
+
+.insight-card .sub {
+  max-width: 42rem;
+}
+
+.insight-success {
+  border-color: color-mix(in srgb, var(--success) 40%, var(--border));
+}
+
+.insight-warn {
+  border-color: color-mix(in srgb, var(--warning) 45%, var(--border));
+}
+
+.insight-danger {
+  border-color: color-mix(in srgb, var(--danger) 45%, var(--border));
+}

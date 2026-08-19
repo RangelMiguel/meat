@@ -8,6 +8,7 @@ import type { AppStore } from '../hooks/useAppStore'
 const MODULE_COPY: Record<AppModuleId, { title: MsgId; body: MsgId } | undefined> = {
   today: undefined,
   plan: undefined,
+  progress: undefined,
   recipes: undefined,
   inventory: undefined,
   purchase: undefined,

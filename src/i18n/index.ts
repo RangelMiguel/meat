@@ -28,6 +28,7 @@ const en = {
   closeMenu: 'Close menu',
   navToday: 'Today',
   navPlan: 'Plan',
+  navProgress: 'Progress',
   navWeek: 'Week',
   navRecipes: 'Recipes',
   navInventory: 'Inventory',
@@ -320,7 +321,7 @@ const en = {
   noHistory: 'No history yet',
   noHistoryBody: 'Create a plan and log some food — your days will show up here.',
   noDaysLogged: 'No days logged',
-  noDaysBody: 'When you add food or water, each day will appear in this list.',
+  noDaysBody: 'When you add food, water, or a weigh-in, each day will appear in this list.',
   items: 'items',
 
   today: 'Today',
@@ -721,6 +722,85 @@ const en = {
   onHandHave: '{have} on hand',
   buyAmount: 'Buy {amount}',
   alreadyListed: '{amount} already on the list',
+
+  progressTitle: 'Weight progress',
+  progressSub: 'Log weigh-ins and see whether the calorie plan still fits',
+  progressEmptyTitle: 'Start tracking your weight',
+  progressEmptyBody:
+    'Log your weight a few times a week. After about two weeks we can tell if the calorie plan needs a tweak.',
+  logWeight: 'Log weight',
+  logWeightSub: 'One weigh-in per day. Logging again updates that day.',
+  weighInDate: 'Date',
+  saveWeight: 'Save weigh-in',
+  weightSaved: 'Weigh-in saved',
+  removeWeighIn: 'Remove weigh-in',
+  removeWeighInConfirm: 'Remove this weigh-in?',
+  noWeighIns: 'No weigh-ins yet',
+  recentWeighIns: 'Weigh-ins',
+  currentWeight: 'Current',
+  startWeight: 'Start',
+  totalChange: 'Change',
+  weeklyRate: 'Weekly rate',
+  planUsesWeight: 'Plan uses',
+  kgUnit: 'kg',
+  kgPerWeek: '{kg} kg/week',
+  lostKg: 'lost {kg} kg',
+  gainedKg: 'gained {kg} kg',
+  unchangedKg: 'no change',
+  weightChartEmpty: 'Log at least two weigh-ins to see a trend.',
+  weightChartAria: 'Weight from {from} kg to {to} kg',
+  expectedTrend: 'Expected from your plan',
+  actualTrend: 'Logged weight',
+  insightNeedLogsTitle: 'Log your first weigh-in',
+  insightNeedLogsBody:
+    'Use the same scale, in the morning if you can. We chart progress from here.',
+  insightNeedMoreTitle: 'Keep logging for a clearer trend',
+  insightNeedMoreBody:
+    'Weight jumps around day to day. A couple of weeks of weigh-ins tells us if the plan is working.',
+  insightOnTrackTitle: 'You are on track',
+  insightOnTrackBody:
+    'About {actual} kg/week versus the {expected} kg/week your plan aims for. Keep going.',
+  insightTooSlowLoseTitle: 'Loss is slower than the plan',
+  insightTooSlowLoseBody:
+    'You are losing about {actual} kg/week; the plan aims for {expected} kg/week. Lowering the target to {kcal} kcal/day (about {weekly} kg/week) usually closes that gap — if you have been hitting today’s calories.',
+  insightTooSlowGainTitle: 'Gain is slower than the plan',
+  insightTooSlowGainBody:
+    'You are gaining about {actual} kg/week; the plan aims for {expected} kg/week. Raising the target to {kcal} kcal/day can help if you have been consistent.',
+  insightTooFastLoseTitle: 'You are losing faster than planned',
+  insightTooFastLoseBody:
+    'About {actual} kg/week is quicker than {expected} kg/week. If you feel drained, raise calories toward {kcal} kcal/day.',
+  insightTooFastGainTitle: 'You are gaining faster than planned',
+  insightTooFastGainBody:
+    'About {actual} kg/week is quicker than {expected} kg/week. Lowering to {kcal} kcal/day can slow it down.',
+  insightWrongWayLoseTitle: 'Weight is going up, not down',
+  insightWrongWayLoseBody:
+    'The log shows about {actual} kg/week up while the plan is a deficit. Check portions, drinks, and extras — or drop the target to {kcal} kcal/day.',
+  insightWrongWayGainTitle: 'Weight is going down, not up',
+  insightWrongWayGainBody:
+    'The log shows about {actual} kg/week down while the plan is a surplus. Raise the target to {kcal} kcal/day if you still want to gain.',
+  insightRecalcTitle: 'Your plan still uses {planKg} kg',
+  insightRecalcBody:
+    'You are at {currentKg} kg now ({delta} kg from the weight in the plan). Recalculating updates BMR, daily calories, and macros for this weight.',
+  insightMaintainOkTitle: 'Weight is holding steady',
+  insightMaintainOkBody: 'About {actual} kg/week. That matches a maintain plan.',
+  insightMaintainDriftTitle: 'Weight is drifting off maintain',
+  insightMaintainDriftBody:
+    'About {actual} kg/week while the plan is maintain. Recalculate at {currentKg} kg so the calorie target matches you now.',
+  applyReduceCalories: 'Lower plan to {kcal} kcal',
+  applyIncreaseCalories: 'Raise plan to {kcal} kcal',
+  applyRecalculate: 'Recalculate at {kg} kg',
+  planUpdatedFromWeight: 'Plan updated to {kcal} kcal/day',
+  todayWeightTitle: 'Today’s weight',
+  todayWeightSub: 'Log it so we can track the trend',
+  todayWeightLogged: 'Logged today · {kg} kg',
+  todayWeightLast: 'Last: {kg} kg · {when}',
+  seeProgress: 'See progress',
+  weightFluctuationNote:
+    'Daily swings of 0.5–1 kg from water, salt, and meals are normal. Trends over weeks matter more than one morning.',
+  errWeightRange: 'Use a weight between 35 and 300 kg.',
+  errWeightDate: 'Pick today or an earlier day.',
+  noPlanProgressTitle: 'Set up a plan first',
+  noPlanProgressBody: 'A calorie plan gives the graph something to compare your weigh-ins against.',
 } as const
 
 const es: Record<keyof typeof en, string> = {
@@ -732,6 +812,7 @@ const es: Record<keyof typeof en, string> = {
   closeMenu: 'Cerrar menú',
   navToday: 'Hoy',
   navPlan: 'Plan',
+  navProgress: 'Progreso',
   navWeek: 'Semana',
   navRecipes: 'Recetas',
   navInventory: 'Inventario',
@@ -1024,7 +1105,7 @@ const es: Record<keyof typeof en, string> = {
   noHistory: 'Aún no hay historial',
   noHistoryBody: 'Crea un plan y registra comida — aquí aparecerán tus días.',
   noDaysLogged: 'No hay días registrados',
-  noDaysBody: 'Cuando agregues comida o agua, cada día aparecerá en esta lista.',
+  noDaysBody: 'Cuando agregues comida, agua o un peso, cada día aparecerá en esta lista.',
   items: 'elementos',
 
   today: 'Hoy',
@@ -1425,6 +1506,85 @@ const es: Record<keyof typeof en, string> = {
   onHandHave: '{have} en casa',
   buyAmount: 'Compra {amount}',
   alreadyListed: '{amount} ya está en la lista',
+
+  progressTitle: 'Progreso de peso',
+  progressSub: 'Registra tu peso y mira si el plan de calorías sigue encajando',
+  progressEmptyTitle: 'Empieza a registrar tu peso',
+  progressEmptyBody:
+    'Pésate unas veces por semana. En unas dos semanas podemos ver si el plan de calorías necesita un ajuste.',
+  logWeight: 'Registrar peso',
+  logWeightSub: 'Un registro por día. Si vuelves a guardar, se actualiza ese día.',
+  weighInDate: 'Fecha',
+  saveWeight: 'Guardar peso',
+  weightSaved: 'Peso guardado',
+  removeWeighIn: 'Quitar registro',
+  removeWeighInConfirm: '¿Quitar este registro de peso?',
+  noWeighIns: 'Aún no hay registros de peso',
+  recentWeighIns: 'Registros',
+  currentWeight: 'Actual',
+  startWeight: 'Inicio',
+  totalChange: 'Cambio',
+  weeklyRate: 'Ritmo semanal',
+  planUsesWeight: 'El plan usa',
+  kgUnit: 'kg',
+  kgPerWeek: '{kg} kg/semana',
+  lostKg: 'bajaste {kg} kg',
+  gainedKg: 'subiste {kg} kg',
+  unchangedKg: 'sin cambio',
+  weightChartEmpty: 'Registra al menos dos pesajes para ver la tendencia.',
+  weightChartAria: 'Peso de {from} kg a {to} kg',
+  expectedTrend: 'Esperado según tu plan',
+  actualTrend: 'Peso registrado',
+  insightNeedLogsTitle: 'Registra tu primer peso',
+  insightNeedLogsBody:
+    'Usa la misma báscula, por la mañana si puedes. Desde aquí armamos la gráfica.',
+  insightNeedMoreTitle: 'Sigue registrando para ver la tendencia',
+  insightNeedMoreBody:
+    'El peso sube y baja cada día. Un par de semanas de registros nos dice si el plan funciona.',
+  insightOnTrackTitle: 'Vas bien',
+  insightOnTrackBody:
+    'Unos {actual} kg/semana frente a los {expected} kg/semana que busca el plan. Sigue así.',
+  insightTooSlowLoseTitle: 'Bajas más lento que el plan',
+  insightTooSlowLoseBody:
+    'Bajas unos {actual} kg/semana; el plan busca {expected} kg/semana. Bajar la meta a {kcal} kcal/día (unos {weekly} kg/semana) suele cerrar esa brecha — si has estado cumpliendo las calorías.',
+  insightTooSlowGainTitle: 'Subes más lento que el plan',
+  insightTooSlowGainBody:
+    'Subes unos {actual} kg/semana; el plan busca {expected} kg/semana. Subir la meta a {kcal} kcal/día puede ayudar si has sido constante.',
+  insightTooFastLoseTitle: 'Bajas más rápido de lo planeado',
+  insightTooFastLoseBody:
+    'Unos {actual} kg/semana es más rápido que {expected} kg/semana. Si te sientes agotado, sube hacia {kcal} kcal/día.',
+  insightTooFastGainTitle: 'Subes más rápido de lo planeado',
+  insightTooFastGainBody:
+    'Unos {actual} kg/semana es más rápido que {expected} kg/semana. Bajar a {kcal} kcal/día puede frenarlo.',
+  insightWrongWayLoseTitle: 'El peso sube, no baja',
+  insightWrongWayLoseBody:
+    'El registro muestra unos {actual} kg/semana al alza y el plan es un déficit. Revisa porciones, bebidas y extras — o baja la meta a {kcal} kcal/día.',
+  insightWrongWayGainTitle: 'El peso baja, no sube',
+  insightWrongWayGainBody:
+    'El registro muestra unos {actual} kg/semana a la baja y el plan es un superávit. Sube la meta a {kcal} kcal/día si aún quieres ganar.',
+  insightRecalcTitle: 'Tu plan sigue usando {planKg} kg',
+  insightRecalcBody:
+    'Ahora estás en {currentKg} kg ({delta} kg respecto al peso del plan). Recalcular actualiza el BMR, las calorías del día y los macros para este peso.',
+  insightMaintainOkTitle: 'El peso se mantiene',
+  insightMaintainOkBody: 'Unos {actual} kg/semana. Encaja con un plan de mantener.',
+  insightMaintainDriftTitle: 'El peso se está moviendo',
+  insightMaintainDriftBody:
+    'Unos {actual} kg/semana con un plan de mantener. Recalcula en {currentKg} kg para que la meta coincida contigo ahora.',
+  applyReduceCalories: 'Bajar el plan a {kcal} kcal',
+  applyIncreaseCalories: 'Subir el plan a {kcal} kcal',
+  applyRecalculate: 'Recalcular en {kg} kg',
+  planUpdatedFromWeight: 'Plan actualizado a {kcal} kcal/día',
+  todayWeightTitle: 'Peso de hoy',
+  todayWeightSub: 'Regístralo para seguir la tendencia',
+  todayWeightLogged: 'Registrado hoy · {kg} kg',
+  todayWeightLast: 'Último: {kg} kg · {when}',
+  seeProgress: 'Ver progreso',
+  weightFluctuationNote:
+    'Subidas y bajadas de 0.5–1 kg por agua, sal y comidas son normales. Importa la tendencia de semanas, no una mañana.',
+  errWeightRange: 'Usa un peso entre 35 y 300 kg.',
+  errWeightDate: 'Elige hoy o un día anterior.',
+  noPlanProgressTitle: 'Primero arma un plan',
+  noPlanProgressBody: 'Un plan de calorías le da a la gráfica algo con qué comparar tus pesajes.',
 }
 
 export type MsgId = keyof typeof en

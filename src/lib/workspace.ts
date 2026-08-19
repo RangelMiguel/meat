@@ -5,6 +5,7 @@ import { BadRequestError, canAdmin, requireHouseholdAccess } from './auth'
 import { createHouseholdWithOwner } from './household'
 import { normalizeInviteCode, uniqueInviteCode } from './invite'
 import { clampBoughtOn, clampGrams, todayKey } from './calories'
+import { clampWeightKg, isValidWeightKg } from './weightProgress'
 import { consumeInventoryLots, recipeNeedsForServings } from './portions'
 import { parseWeekPlan } from './weekPlan'
 import {
@@ -37,6 +38,7 @@ import type {
   Member,
   PurchaseItem,
   WeekMealSlot,
+  WeightEntry,
 } from '../types'
 import type { Locale } from '../i18n'
 import { normalizeThemeId, type ThemeId } from '../themes'
@@ -51,6 +53,7 @@ const workspaceInclude = {
       entries: { orderBy: { createdAt: 'desc' as const } },
       exercises: { orderBy: { createdAt: 'desc' as const } },
       waterLogs: true,
+      weightLogs: { orderBy: { date: 'desc' as const } },
     },
   },
   kitchen: {
@@ -146,6 +149,15 @@ function toExercise(entry: LoadedHousehold['members'][number]['exercises'][numbe
   }
 }
 
+function toWeight(entry: LoadedHousehold['members'][number]['weightLogs'][number]): WeightEntry {
+  return {
+    id: entry.id,
+    date: entry.date,
+    kg: entry.kg,
+    createdAt: entry.createdAt.toISOString(),
+  }
+}
+
 function toMember(household: LoadedHousehold, member: LoadedHousehold['members'][number], kitchenId: string): Member {
   const water: Record<string, number> = {}
   for (const log of member.waterLogs) {
@@ -160,6 +172,7 @@ function toMember(household: LoadedHousehold, member: LoadedHousehold['members']
     plan: parsePlan(member.planJson),
     entries: member.entries.map(toFood),
     exercises: member.exercises.map(toExercise),
+    weights: member.weightLogs.map(toWeight),
     water,
   }
 }
@@ -386,6 +399,13 @@ const actionSchema = z.discriminatedUnion('action', [
     members: z.array(z.object({ memberId: z.string(), kcal: z.number() })),
   }),
   z.object({ action: z.literal('removeExercise'), id: z.string() }),
+  z.object({
+    action: z.literal('addWeight'),
+    kg: z.number(),
+    date: z.string().optional(),
+    memberId: z.string().optional(),
+  }),
+  z.object({ action: z.literal('removeWeight'), id: z.string() }),
   z.object({
     action: z.literal('setWater'),
     date: z.string(),
@@ -742,6 +762,16 @@ export async function mutateWorkspace(userId: string, raw: unknown): Promise<Wor
         where: { id: target.id },
         data: { name: named, planJson: JSON.stringify(nextPlan) },
       })
+      const existingWeighIns = await prisma.weightLog.count({ where: { memberId: target.id } })
+      if (existingWeighIns === 0 && isValidWeightKg(nextPlan.input.weightKg)) {
+        await prisma.weightLog.create({
+          data: {
+            memberId: target.id,
+            date: todayKey(),
+            kg: clampWeightKg(nextPlan.input.weightKg),
+          },
+        })
+      }
       break
     }
     case 'clearPlan': {
@@ -867,6 +897,31 @@ export async function mutateWorkspace(userId: string, raw: unknown): Promise<Wor
         },
       })
       if (entry) await prisma.exerciseEntry.delete({ where: { id: entry.id } })
+      break
+    }
+    case 'addWeight': {
+      const memberId = body.memberId ?? mine.id
+      if (!household.members.some((member) => member.id === memberId)) {
+        throw new BadRequestError('notInFamily')
+      }
+      if (!isValidWeightKg(body.kg)) throw new BadRequestError('errWeight')
+      const date = clampBoughtOn(body.date ?? todayKey())
+      const kg = clampWeightKg(body.kg)
+      await prisma.weightLog.upsert({
+        where: { memberId_date: { memberId, date } },
+        create: { memberId, date, kg },
+        update: { kg },
+      })
+      break
+    }
+    case 'removeWeight': {
+      const entry = await prisma.weightLog.findFirst({
+        where: {
+          id: body.id,
+          member: { householdId: household.id },
+        },
+      })
+      if (entry) await prisma.weightLog.delete({ where: { id: entry.id } })
       break
     }
     case 'setWater': {

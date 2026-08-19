@@ -1,6 +1,7 @@
 import { useMemo, useState, type FormEvent } from 'react'
 import { Dumbbell } from 'lucide-react'
 import { estimateExerciseKcal, EXERCISE_PRESETS } from '../lib/exercises'
+import { currentWeightKg } from '../lib/weightProgress'
 import { exerciseLabel, t, type Locale } from '../i18n'
 import type { ExerciseKind, Member } from '../types'
 import { EaterPicker } from './EaterPicker'
@@ -38,7 +39,7 @@ export function LogExerciseForm({
 
   const estimates = useMemo(() => {
     return selected.map((member) => {
-      const weight = member.plan?.input.weightKg ?? 70
+      const weight = currentWeightKg(member.weights, member.plan?.input.weightKg)
       const auto = estimateExerciseKcal(kind, minutes, weight)
       const kcal = manualKcal === '' ? auto : Math.max(0, Number(manualKcal) || 0)
       return { memberId: member.id, name: member.name, kcal, auto }

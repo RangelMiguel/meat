@@ -1,6 +1,7 @@
 import type { AppStore } from '../hooks/useAppStore'
 import { exerciseLabel, mealLabel, recipeName, t } from '../i18n'
 import { formatDateLabel } from '../lib/calories'
+import { formatKg } from '../lib/weightProgress'
 import { checkInputFromEntry } from '../lib/geminiCheck'
 import { GeminiCheckButton } from './GeminiCheckButton'
 
@@ -62,6 +63,11 @@ export function HistoryView({ store }: Props) {
             .map((item) => ({ ...item, memberName: member.name })),
         )
         const burned = dayWorkouts.reduce((sum, item) => sum + item.kcal, 0)
+        const dayWeights = household.flatMap((member) =>
+          (member.weights ?? [])
+            .filter((item) => item.date === date)
+            .map((item) => ({ ...item, memberName: member.name })),
+        )
         const glasses = household.reduce((sum, member) => sum + (member.water[date] ?? 0), 0)
         const waterGoal = household.reduce(
           (sum, member) => sum + (member.plan?.waterGlasses ?? 0),
@@ -90,6 +96,12 @@ export function HistoryView({ store }: Props) {
                 <span className="badge badge-info">
                   {glasses}/{waterGoal || '—'} {t(locale, 'water')}
                 </span>
+                {dayWeights.map((item) => (
+                  <span key={item.id} className="badge badge-neutral">
+                    {formatKg(item.kg)} {t(locale, 'kgUnit')}
+                    {household.length > 1 ? ` · ${item.memberName}` : ''}
+                  </span>
+                ))}
               </div>
             </div>
             <div className="macro-track history-bar">

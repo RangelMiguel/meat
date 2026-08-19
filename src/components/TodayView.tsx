@@ -10,6 +10,7 @@ import { LogRecipePanel, type RecipeEater, type RecipeLogPayload } from './LogRe
 import { MEAL_ORDER, type CookSession, type MealType } from '../types'
 import { CalorieRing } from './CalorieRing'
 import { ExerciseFuelCard } from './ExerciseFuelCard'
+import { TodayWeightCard } from './ProgressView'
 import { EaterPicker } from './EaterPicker'
 import { GeminiCheckButton } from './GeminiCheckButton'
 import { checkInputFromEntry } from '../lib/geminiCheck'
@@ -18,6 +19,7 @@ import { exerciseLabel, mealLabel, recipeName, t } from '../i18n'
 interface Props {
   store: AppStore
   onGoPlan: () => void
+  onGoProgress: () => void
   prepareRecipeId?: string | null
   onPrepareHandled?: () => void
   onStartCooking: (session: CookSession) => void
@@ -28,6 +30,7 @@ type LogMode = 'closed' | 'recipe' | 'custom' | 'exercise'
 export function TodayView({
   store,
   onGoPlan,
+  onGoProgress,
   prepareRecipeId,
   onPrepareHandled,
   onStartCooking,
@@ -269,6 +272,8 @@ export function TodayView({
           </div>
         </div>
       </section>
+
+      <TodayWeightCard store={store} onGoProgress={onGoProgress} />
 
       <section className="grid-2 today-mid">
         <div className="card">

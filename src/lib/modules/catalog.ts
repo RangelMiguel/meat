@@ -11,6 +11,7 @@ export type ModuleKind = 'core' | 'addon'
 export type AppModuleId =
   | 'today'
   | 'plan'
+  | 'progress'
   | 'recipes'
   | 'inventory'
   | 'purchase'
@@ -31,6 +32,7 @@ export type AppModuleDef = {
 export const APP_MODULES: AppModuleDef[] = [
   { id: 'today', kind: 'core', view: 'today', priceCents: 0 },
   { id: 'plan', kind: 'core', view: 'plan', priceCents: 0 },
+  { id: 'progress', kind: 'core', view: 'progress', priceCents: 0 },
   { id: 'recipes', kind: 'core', view: 'recipes', priceCents: 0 },
   { id: 'inventory', kind: 'core', view: 'inventory', priceCents: 0 },
   { id: 'purchase', kind: 'core', view: 'purchase', priceCents: 0 },

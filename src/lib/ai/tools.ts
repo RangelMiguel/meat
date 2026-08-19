@@ -277,6 +277,20 @@ export const MEAT_TOOLS: ToolSpec[] = [
     },
   },
   {
+    name: 'log_weight',
+    description:
+      'Log a weigh-in for the current user. One value per day; logging again updates that day. Use kilograms.',
+    parameters: {
+      type: 'object',
+      properties: {
+        kg: { type: 'number', description: 'Body weight in kilograms' },
+        date: { type: 'string', description: 'YYYY-MM-DD, defaults to today' },
+      },
+      required: ['kg'],
+      additionalProperties: false,
+    },
+  },
+  {
     name: 'set_water',
     description: 'Set how many water glasses the user logged for a day.',
     parameters: {
@@ -340,6 +354,8 @@ export async function executeMeatTool(ctx: MeatToolContext, call: ToolCallReques
       return addWeekMeal(ctx, args)
     case 'log_exercise':
       return logExercise(ctx, args)
+    case 'log_weight':
+      return logWeight(ctx, args)
     case 'set_water':
       return setWater(ctx, args)
     default:
@@ -523,6 +539,7 @@ async function listToday(ctx: MeatToolContext): Promise<ToolExecResult> {
       entries: { where: { date: today }, orderBy: { createdAt: 'desc' } },
       exercises: { where: { date: today } },
       waterLogs: { where: { date: today } },
+      weightLogs: { where: { date: today } },
     },
   })
   if (!member) return { ok: false, summary: 'Member not found', error: 'member' }
@@ -551,6 +568,7 @@ async function listToday(ctx: MeatToolContext): Promise<ToolExecResult> {
         kcal: e.kcal,
       })),
       waterGlasses: member.waterLogs[0]?.glasses ?? 0,
+      weightKg: member.weightLogs[0]?.kg ?? null,
     },
   }
 }
@@ -963,6 +981,22 @@ async function logExercise(ctx: MeatToolContext, args: Record<string, unknown>):
     mutated: true,
     summary: `Logged ${name} · ${Math.round(minutes)} min · ${kcal} kcal`,
     data: { kind, name, minutes, kcal },
+  }
+}
+
+async function logWeight(ctx: MeatToolContext, args: Record<string, unknown>): Promise<ToolExecResult> {
+  const kg = num(args.kg)
+  if (kg == null || kg < 35 || kg > 300) {
+    return { ok: false, summary: 'kg must be between 35 and 300', error: 'kg' }
+  }
+  const date = validDate(str(args.date)) || todayKey()
+  const { member } = await kitchenPayload(ctx.userId)
+  await mutateWorkspace(ctx.userId, { action: 'addWeight', kg, date, memberId: member.id })
+  return {
+    ok: true,
+    mutated: true,
+    summary: `Logged ${kg} kg on ${date}`,
+    data: { kg, date },
   }
 }
 
