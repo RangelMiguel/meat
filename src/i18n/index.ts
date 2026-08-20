@@ -683,9 +683,18 @@ const en = {
 
   weekTitle: "This week's meals",
   weekSub:
-    'Plan every day this week. This is just a plan — change any meal anytime. It does not fill Today.',
+    'Plan every day this week for the household. Each person gets their own portion. This is just a plan — it does not fill Today.',
   weekEmpty: 'No dishes picked yet',
   weekEmptyBody: 'Choose breakfast, lunch, dinner, or a snack for any day this week.',
+  weekEveryone: 'Everyone',
+  weekEatersHint: 'Same dish for the people you pick. Portions come from each person’s calorie plan.',
+  weekHouseholdHint: 'Household plan — each name is a personal portion you can still change.',
+  randomWeekHouseholdConfirm:
+    'Replace this week’s dishes for everyone with the same random meals, sized to each person’s plan?',
+  clearWeekHouseholdConfirm: 'Remove every dish for everyone this week?',
+  removeEaterFromMeal: 'Remove {name} from this meal',
+  suggestedForHousehold: 'Portions sized to each selected person’s {meal} budget',
+  peopleCount: '{count} people',
   addDish: 'Add dish',
   changeDish: 'Change',
   clearSlot: 'Remove dish',
@@ -730,7 +739,7 @@ const en = {
     "Replace this week's dishes with a random plan? You can still change any meal after.",
   planWeekCtaTitle: 'Plan the week',
   planWeekCtaBody:
-    'Pick breakfast, lunch, and dinner for all 7 days. This stays a plan — Today and your food log stay empty until you cook or log.',
+    'Pick breakfast, lunch, and dinner for all 7 days, for you and the household. Each person gets their own portion. Today stays empty until you cook or log.',
   planWeekCta: 'Open week planner',
   weekProgressTitle: "This week's plan",
   weekProgressSub: 'What you intend to eat. Swap dishes whenever the week changes.',
@@ -1497,9 +1506,18 @@ const es: Record<keyof typeof en, string> = {
 
   weekTitle: 'Comidas de la semana',
   weekSub:
-    'Planea todos los días de la semana. Es solo un plan: cambia cualquier comida cuando quieras. No llena Hoy.',
+    'Planea todos los días de la semana para el hogar. Cada persona tiene su porción. Es solo un plan: no llena Hoy.',
   weekEmpty: 'Aún no hay platillos',
   weekEmptyBody: 'Elige desayuno, comida, cena o un snack para cualquier día de la semana.',
+  weekEveryone: 'Todos',
+  weekEatersHint: 'El mismo platillo para quienes elijas. Las porciones salen del plan de calorías de cada quien.',
+  weekHouseholdHint: 'Plan del hogar: cada nombre es una porción personal que aún puedes cambiar.',
+  randomWeekHouseholdConfirm:
+    '¿Reemplazar los platillos de todos esta semana con las mismas comidas al azar, ajustadas al plan de cada persona?',
+  clearWeekHouseholdConfirm: '¿Quitar todos los platillos de todos esta semana?',
+  removeEaterFromMeal: 'Quitar a {name} de esta comida',
+  suggestedForHousehold: 'Porciones según el presupuesto de {meal} de cada persona elegida',
+  peopleCount: '{count} personas',
   addDish: 'Agregar platillo',
   changeDish: 'Cambiar',
   clearSlot: 'Quitar platillo',
@@ -1544,7 +1562,7 @@ const es: Record<keyof typeof en, string> = {
     '¿Reemplazar los platillos de esta semana con un plan al azar? Después puedes cambiar cualquier comida.',
   planWeekCtaTitle: 'Planear la semana',
   planWeekCtaBody:
-    'Elige desayuno, comida y cena para los 7 días. Se queda como plan: Hoy y tu registro siguen vacíos hasta que cocines o registres.',
+    'Elige desayuno, comida y cena para los 7 días, para ti y el hogar. Cada persona tiene su porción. Hoy sigue vacío hasta que cocines o registres.',
   planWeekCta: 'Abrir plan semanal',
   weekProgressTitle: 'Plan de la semana',
   weekProgressSub: 'Lo que pretendes comer. Cambia platillos cuando cambie la semana.',

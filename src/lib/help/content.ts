@@ -189,9 +189,9 @@ const en: HelpContent = {
           summary: 'Pick meals, compute the shop, and pack the fridge.',
           view: 'week',
           paragraphs: [
-            'Choose dishes for each day of the week, or tap Random week for a full Monday–Sunday draft. Meat sizes portions from each person’s calorie plan, not from today’s food log.',
+            'Choose dishes for each day of the week for the whole household, or tap Random week for a Monday–Sunday draft. Everyone gets the same dish; portions come from each person’s calorie plan, not from today’s food log.',
             'The shopping list covers the whole week minus what is already in inventory, and tells you what belongs in the fridge versus freezer bags.',
-            'The week is a living plan. Change any meal later — it never auto-logs those dishes on Today.',
+            'The week is a living plan. Change any meal or one person’s portion later — it never auto-logs those dishes on Today.',
           ],
         },
         {
@@ -423,9 +423,9 @@ const es: HelpContent = {
           summary: 'Elige comidas, calcula la compra y empaca el refri.',
           view: 'week',
           paragraphs: [
-            'Elige platillos para cada día de la semana, o toca Semana al azar para un borrador de lunes a domingo. Meat ajusta las porciones con el plan de calorías, no con lo que ya registraste hoy.',
+            'Elige platillos para cada día de la semana para todo el hogar, o toca Semana al azar para un borrador de lunes a domingo. Todos reciben el mismo platillo; las porciones salen del plan de cada persona, no de lo que ya registraste hoy.',
             'La lista de compras cubre toda la semana menos lo que ya hay, y te dice qué va al refrigerador y qué en bolsas al congelador.',
-            'La semana es un plan vivo. Cambia cualquier comida después: nunca registra esos platillos sola en Hoy.',
+            'La semana es un plan vivo. Cambia cualquier comida o la porción de una persona después: nunca registra esos platillos sola en Hoy.',
           ],
         },
         {

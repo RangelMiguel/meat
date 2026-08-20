@@ -15,6 +15,7 @@ import {
   getIngredient,
   recipeCuisine,
   type Cuisine,
+  type Recipe,
 } from '../data/catalog'
 import type { AppStore } from '../hooks/useAppStore'
 import {
@@ -31,20 +32,21 @@ import {
   recipePerServingMacros,
   roundServings,
   scaleMacros,
-  suggestPortion,
 } from '../lib/portions'
 import {
   addDays,
   buildRandomWeekPlan,
   buildWeekShopping,
   mondayOf,
+  servingsForPlan,
   slotsInWeek,
   storageLines,
   weekDates,
   weekdayLong,
   weekRangeLabel,
 } from '../lib/weekPlan'
-import { MEAL_ORDER, type MealType, type WeekMealSlot } from '../types'
+import { MEAL_ORDER, type MealType, type Member, type WeekMealSlot } from '../types'
+import { EaterPicker } from './EaterPicker'
 
 interface Props {
   store: AppStore
@@ -54,28 +56,46 @@ interface Props {
   onGoPurchase: () => void
 }
 
+type Scope = 'all' | string
+
 export function WeekPlanView({ store, memberId, onSelectMember, onNeedPlan, onGoPurchase }: Props) {
   const locale = store.locale
   const today = todayKey()
+  const planners = useMemo(() => store.household.filter((item) => item.plan), [store.household])
   const [weekStart, setWeekStart] = useState(() => mondayOf(today))
+  const [scope, setScope] = useState<Scope>(() => (planners.length > 1 ? 'all' : memberId))
   const [picker, setPicker] = useState<{ date: string; meal: MealType } | null>(null)
+  const [eaterIds, setEaterIds] = useState<string[]>(() => planners.map((item) => item.id))
   const [query, setQuery] = useState('')
   const [cuisine, setCuisine] = useState<Cuisine | 'all'>('all')
   const [added, setAdded] = useState(false)
 
   const member =
-    store.household.find((item) => item.id === memberId) ?? store.myMember ?? store.household[0]
-  const plan = member?.plan ?? null
+    store.household.find((item) => item.id === (scope === 'all' ? memberId : scope)) ??
+    store.myMember ??
+    store.household[0]
   const slots = store.weekPlan.slots
+  const householdMode = planners.length > 1 && scope === 'all'
 
   useEffect(() => {
     setAdded(false)
   }, [weekStart, slots, store.purchaseList])
 
+  useEffect(() => {
+    setEaterIds((ids) => {
+      const valid = ids.filter((id) => planners.some((item) => item.id === id))
+      if (valid.length > 0) return valid
+      return planners.map((item) => item.id)
+    })
+  }, [planners])
+
   const weekSlotList = useMemo(() => slotsInWeek(slots, weekStart), [slots, weekStart])
-  const memberSlots = useMemo(
-    () => weekSlotList.filter((slot) => slot.memberId === member?.id),
-    [weekSlotList, member?.id],
+  const visibleSlots = useMemo(
+    () =>
+      householdMode
+        ? weekSlotList
+        : weekSlotList.filter((slot) => slot.memberId === (scope === 'all' ? member?.id : scope)),
+    [weekSlotList, householdMode, scope, member?.id],
   )
   const shopSlots = weekSlotList
   const days = useMemo(() => weekDates(weekStart), [weekStart])
@@ -94,39 +114,58 @@ export function WeekPlanView({ store, memberId, onSelectMember, onNeedPlan, onGo
 
   const toAdd = shopping.filter((item) => item.addGrams > 0)
   const plannedKcal = useMemo(() => {
-    return memberSlots.reduce((sum, slot) => {
+    return visibleSlots.reduce((sum, slot) => {
       const recipe = store.recipeById(slot.recipeId)
       if (!recipe) return sum
       return sum + Math.round(recipePerServingMacros(recipe).kcal * slot.servings)
     }, 0)
-  }, [memberSlots, store])
-  const weekGoal = (plan?.dailyCalories ?? 0) * 7
+  }, [visibleSlots, store])
+  const weekGoal = householdMode
+    ? planners.reduce((sum, item) => sum + (item.plan?.dailyCalories ?? 0) * 7, 0)
+    : (member?.plan?.dailyCalories ?? 0) * 7
+  const shoppers = useMemo(() => {
+    const ids = new Set(weekSlotList.map((slot) => slot.memberId))
+    return store.household.filter((item) => ids.has(item.id))
+  }, [weekSlotList, store.household])
 
   const persist = (next: WeekMealSlot[]) => {
     store.saveWeekPlan(next)
   }
 
-  const setSlot = (date: string, meal: MealType, recipeId: string, servings: number) => {
-    if (!member) return
-    const existing = slots.find(
-      (slot) => slot.date === date && slot.meal === meal && slot.memberId === member.id,
+  const openPicker = (date: string, meal: MealType, presetIds?: string[]) => {
+    setPicker({ date, meal })
+    setQuery('')
+    if (presetIds && presetIds.length > 0) {
+      setEaterIds(presetIds)
+    } else if (householdMode) {
+      setEaterIds(planners.map((item) => item.id))
+    } else if (member) {
+      setEaterIds([member.id])
+    }
+  }
+
+  const setDishForEaters = (date: string, meal: MealType, recipeId: string, ids: string[]) => {
+    const recipe = store.recipeById(recipeId)
+    if (!recipe || ids.length === 0) return
+    const targets = new Set(ids)
+    const keep = slots.filter(
+      (slot) => !(slot.date === date && slot.meal === meal && targets.has(slot.memberId)),
     )
-    const next = existing
-      ? slots.map((slot) =>
-          slot.id === existing.id ? { ...slot, recipeId, servings } : slot,
-        )
-      : [
-          ...slots,
-          {
-            id: uid(),
-            date,
-            meal,
-            recipeId,
-            servings,
-            memberId: member.id,
-          },
-        ]
-    persist(next)
+    const addedSlots: WeekMealSlot[] = []
+    for (const id of ids) {
+      const person = planners.find((item) => item.id === id) ?? store.household.find((item) => item.id === id)
+      const daily = person?.plan?.dailyCalories
+      if (!daily) continue
+      addedSlots.push({
+        id: uid(),
+        date,
+        meal,
+        recipeId,
+        servings: servingsForPlan(recipe, daily, meal),
+        memberId: id,
+      })
+    }
+    persist([...keep, ...addedSlots])
     setPicker(null)
     setQuery('')
   }
@@ -139,14 +178,24 @@ export function WeekPlanView({ store, memberId, onSelectMember, onNeedPlan, onGo
     persist(slots.filter((slot) => slot.id !== slotId))
   }
 
+  const clearSlots = (slotIds: string[]) => {
+    const drop = new Set(slotIds)
+    persist(slots.filter((slot) => !drop.has(slot.id)))
+  }
+
+  const peopleInScope = householdMode ? planners : member ? [member] : []
+
   const clearWeek = () => {
-    if (!member) return
-    if (!confirm(t(locale, 'clearWeekConfirm'))) return
-    const keep = slots.filter((slot) => {
-      const inWeek = slot.date >= weekStart && slot.date <= addDays(weekStart, 6)
-      return !(inWeek && slot.memberId === member.id)
-    })
-    persist(keep)
+    if (peopleInScope.length === 0) return
+    const confirmKey = householdMode ? 'clearWeekHouseholdConfirm' : 'clearWeekConfirm'
+    if (!confirm(t(locale, confirmKey))) return
+    const ids = new Set(peopleInScope.map((item) => item.id))
+    persist(
+      slots.filter((slot) => {
+        const inWeek = slot.date >= weekStart && slot.date <= addDays(weekStart, 6)
+        return !(inWeek && ids.has(slot.memberId))
+      }),
+    )
   }
 
   const addShopping = () => {
@@ -156,26 +205,27 @@ export function WeekPlanView({ store, memberId, onSelectMember, onNeedPlan, onGo
   }
 
   const fillRandomWeek = () => {
-    if (!member || !plan) return
-    if (memberSlots.length > 0 && !confirm(t(locale, 'randomWeekConfirm'))) return
+    const people = peopleInScope.filter((item) => item.plan)
+    if (people.length === 0) return
+    const hasDishes = visibleSlots.length > 0
+    const confirmKey = householdMode ? 'randomWeekHouseholdConfirm' : 'randomWeekConfirm'
+    if (hasDishes && !confirm(t(locale, confirmKey))) return
     const generated = buildRandomWeekPlan({
       weekStart,
-      memberId: member.id,
-      dailyCalories: plan.dailyCalories,
+      members: people.map((item) => ({
+        id: item.id,
+        dailyCalories: item.plan!.dailyCalories,
+      })),
       recipes: store.recipes,
     })
     if (generated.length === 0) return
+    const ids = new Set(people.map((item) => item.id))
     const keep = slots.filter((slot) => {
       const inWeek = slot.date >= weekStart && slot.date <= addDays(weekStart, 6)
-      return !(inWeek && slot.memberId === member.id)
+      return !(inWeek && ids.has(slot.memberId))
     })
     persist([...keep, ...generated])
   }
-
-  const planners = useMemo(() => {
-    const ids = new Set(weekSlotList.map((slot) => slot.memberId))
-    return store.household.filter((item) => ids.has(item.id))
-  }, [weekSlotList, store.household])
 
   const filteredRecipes = useMemo(() => {
     const q = query.trim().toLowerCase()
@@ -196,7 +246,7 @@ export function WeekPlanView({ store, memberId, onSelectMember, onNeedPlan, onGo
       .slice(0, 48)
   }, [query, cuisine, store.recipes, locale])
 
-  if (!member || !plan) {
+  if (planners.length === 0) {
     return (
       <div className="stack-lg">
         <div className="section-title">
@@ -225,16 +275,28 @@ export function WeekPlanView({ store, memberId, onSelectMember, onNeedPlan, onGo
         <span>{t(locale, 'weekSub')}</span>
       </div>
 
-      {store.household.length > 1 && (
+      {planners.length > 1 && (
         <div className="theme-pills" role="tablist" aria-label={t(locale, 'weekTitle')}>
-          {store.household.map((item) => (
+          <button
+            type="button"
+            role="tab"
+            aria-selected={householdMode}
+            className={`theme-pill${householdMode ? ' is-active' : ''}`}
+            onClick={() => setScope('all')}
+          >
+            {t(locale, 'weekEveryone')}
+          </button>
+          {planners.map((item) => (
             <button
               key={item.id}
               type="button"
               role="tab"
-              aria-selected={item.id === member.id}
-              className={`theme-pill${item.id === member.id ? ' is-active' : ''}`}
-              onClick={() => onSelectMember(item.id)}
+              aria-selected={scope === item.id}
+              className={`theme-pill${scope === item.id ? ' is-active' : ''}`}
+              onClick={() => {
+                setScope(item.id)
+                onSelectMember(item.id)
+              }}
             >
               {item.name}
             </button>
@@ -272,7 +334,7 @@ export function WeekPlanView({ store, memberId, onSelectMember, onNeedPlan, onGo
             <Shuffle size={14} />
             {t(locale, 'randomWeek')}
           </button>
-          {memberSlots.length > 0 && (
+          {visibleSlots.length > 0 && (
             <button type="button" className="btn btn-ghost btn-sm" onClick={clearWeek}>
               {t(locale, 'clearWeek')}
             </button>
@@ -285,7 +347,9 @@ export function WeekPlanView({ store, memberId, onSelectMember, onNeedPlan, onGo
           <div className="card-header">
             <div>
               <h4>{t(locale, 'weekTotals')}</h4>
-              <p className="sub">{t(locale, 'weekPickedHint')}</p>
+              <p className="sub">
+                {householdMode ? t(locale, 'weekHouseholdHint') : t(locale, 'weekPickedHint')}
+              </p>
             </div>
           </div>
           <div className="result-grid">
@@ -301,101 +365,98 @@ export function WeekPlanView({ store, memberId, onSelectMember, onNeedPlan, onGo
             </div>
             <div className="result-tile">
               <span>{t(locale, 'dishes')}</span>
-              <strong>{memberSlots.length}</strong>
-              <em>{t(locale, memberSlots.length === 1 ? 'itemOne' : 'itemMany')}</em>
+              <strong>
+                {householdMode
+                  ? new Set(visibleSlots.map((slot) => `${slot.date}|${slot.meal}|${slot.recipeId}`)).size
+                  : visibleSlots.length}
+              </strong>
+              <em>
+                {householdMode
+                  ? t(locale, 'peopleCount', { count: planners.length })
+                  : t(locale, visibleSlots.length === 1 ? 'itemOne' : 'itemMany')}
+              </em>
             </div>
           </div>
         </div>
       )}
 
       <div className="week-days">
-        {days.map((date) => {
-          return (
-            <div key={date} className="card week-day">
-              <div className="week-day-head">
-                <strong>{weekdayLong(date, locale)}</strong>
-                {date === today && <span className="badge badge-neutral">{t(locale, 'today')}</span>}
-              </div>
-              <ul className="week-slots">
-                {MEAL_ORDER.map((meal) => {
-                  const slot = memberSlots.find((item) => item.date === date && item.meal === meal)
-                  const recipe = slot ? store.recipeById(slot.recipeId) : undefined
-                  const macros =
-                    recipe && slot ? scaleMacros(recipePerServingMacros(recipe), slot.servings) : null
-                  return (
-                    <li key={meal} className="week-slot">
-                      <div className="week-slot-meal">{mealLabel(locale, meal)}</div>
-                      {slot && recipe ? (
-                        <div className="week-slot-body">
-                          <div className="week-slot-copy">
-                            <strong>{recipeName(recipe, locale)}</strong>
-                            <p>{macros ? formatMacrosLine(macros) : ''}</p>
-                          </div>
-                          <div className="week-slot-actions">
-                            <div className="eater-stepper">
-                              <button
-                                type="button"
-                                className="btn btn-ghost btn-sm"
-                                onClick={() => updateServings(slot.id, roundServings(slot.servings - 0.25))}
-                                aria-label="−"
-                              >
-                                −
-                              </button>
-                              <span className="week-servings">{slot.servings}</span>
-                              <button
-                                type="button"
-                                className="btn btn-ghost btn-sm"
-                                onClick={() =>
-                                  updateServings(slot.id, roundServings(Math.min(3, slot.servings + 0.25)))
-                                }
-                                aria-label="+"
-                              >
-                                +
-                              </button>
-                            </div>
-                            <button
-                              type="button"
-                              className="btn btn-ghost btn-sm"
-                              onClick={() => {
-                                setPicker({ date, meal })
-                                setQuery('')
-                              }}
-                            >
-                              {t(locale, 'changeDish')}
-                            </button>
-                            <button
-                              type="button"
-                              className="btn btn-ghost btn-icon icon-danger"
-                              onClick={() => clearSlot(slot.id)}
-                              aria-label={t(locale, 'clearSlot')}
-                            >
-                              <Trash2 size={15} />
-                            </button>
-                          </div>
-                        </div>
-                      ) : (
-                        <button
-                          type="button"
-                          className="week-slot-add"
-                          onClick={() => {
-                            setPicker({ date, meal })
-                            setQuery('')
-                          }}
-                        >
-                          <Plus size={14} />
-                          {t(locale, 'addDish')}
-                        </button>
-                      )}
-                    </li>
-                  )
-                })}
-              </ul>
+        {days.map((date) => (
+          <div key={date} className="card week-day">
+            <div className="week-day-head">
+              <strong>{weekdayLong(date, locale)}</strong>
+              {date === today && <span className="badge badge-neutral">{t(locale, 'today')}</span>}
             </div>
-          )
-        })}
+            <ul className="week-slots">
+              {MEAL_ORDER.map((meal) => {
+                const mealSlots = visibleSlots.filter((item) => item.date === date && item.meal === meal)
+                const groups = groupByRecipe(mealSlots)
+                return (
+                  <li key={meal} className="week-slot">
+                    <div className="week-slot-meal">{mealLabel(locale, meal)}</div>
+                    {groups.length === 0 ? (
+                      <button
+                        type="button"
+                        className="week-slot-add"
+                        onClick={() => openPicker(date, meal)}
+                      >
+                        <Plus size={14} />
+                        {t(locale, 'addDish')}
+                      </button>
+                    ) : (
+                      <div className="week-slot-groups">
+                        {groups.map((group) => {
+                          const recipe = store.recipeById(group.recipeId)
+                          if (!recipe) return null
+                          return (
+                            <DishGroup
+                              key={group.recipeId}
+                              locale={locale}
+                              recipe={recipe}
+                              groupSlots={group.slots}
+                              household={store.household}
+                              showNames={householdMode || group.slots.length > 1}
+                              onUpdateServings={updateServings}
+                              onClearSlot={clearSlot}
+                              onClearGroup={() => clearSlots(group.slots.map((slot) => slot.id))}
+                              onChange={() =>
+                                openPicker(
+                                  date,
+                                  meal,
+                                  group.slots.map((slot) => slot.memberId),
+                                )
+                              }
+                            />
+                          )
+                        })}
+                        {householdMode && mealSlots.length < planners.length && (
+                          <button
+                            type="button"
+                            className="week-slot-add"
+                            onClick={() => {
+                              const taken = new Set(mealSlots.map((slot) => slot.memberId))
+                              openPicker(
+                                date,
+                                meal,
+                                planners.filter((item) => !taken.has(item.id)).map((item) => item.id),
+                              )
+                            }}
+                          >
+                            <Plus size={14} />
+                            {t(locale, 'addDish')}
+                          </button>
+                        )}
+                      </div>
+                    )}
+                  </li>
+                )
+              })}
+            </ul>
+          </div>
+        ))}
       </div>
 
-      {memberSlots.length === 0 && (
+      {visibleSlots.length === 0 && (
         <div className="card">
           <div className="empty-state" style={{ padding: '1.25rem 0.5rem' }}>
             <div className="empty-icon">
@@ -417,9 +478,9 @@ export function WeekPlanView({ store, memberId, onSelectMember, onNeedPlan, onGo
               </div>
               <span className="badge badge-neutral">{shopping.filter((item) => item.buyGrams > 0).length}</span>
             </div>
-            {planners.length > 1 && (
+            {shoppers.length > 1 && (
               <p className="field-hint" style={{ marginTop: 0 }}>
-                {t(locale, 'includesMembers', { names: planners.map((item) => item.name).join(', ') })}
+                {t(locale, 'includesMembers', { names: shoppers.map((item) => item.name).join(', ') })}
               </p>
             )}
             {shopping.filter((item) => item.buyGrams > 0).length === 0 ? (
@@ -517,8 +578,22 @@ export function WeekPlanView({ store, memberId, onSelectMember, onNeedPlan, onGo
               {t(locale, 'pickWeekDish')} · {mealLabel(locale, picker.meal)}
             </h3>
             <p>
-              {weekdayLong(picker.date, locale)} · {t(locale, 'suggestedForSlot', { meal: mealLabel(locale, picker.meal).toLowerCase() })}
+              {weekdayLong(picker.date, locale)} ·{' '}
+              {householdMode || eaterIds.length > 1
+                ? t(locale, 'suggestedForHousehold', {
+                    meal: mealLabel(locale, picker.meal).toLowerCase(),
+                  })
+                : t(locale, 'suggestedForSlot', {
+                    meal: mealLabel(locale, picker.meal).toLowerCase(),
+                  })}
             </p>
+            <EaterPicker
+              locale={locale}
+              eaters={planners}
+              selected={eaterIds}
+              onChange={setEaterIds}
+              hint={t(locale, 'weekEatersHint')}
+            />
             <div className="form-row form-row-3" style={{ marginTop: '0.85rem' }}>
               <div className="field">
                 <label htmlFor="week-cuisine">{t(locale, 'cuisine')}</label>
@@ -553,25 +628,30 @@ export function WeekPlanView({ store, memberId, onSelectMember, onNeedPlan, onGo
             <div className="recipe-picker-grid week-picker-grid">
               {filteredRecipes.map((recipe) => {
                 const per = recipePerServingMacros(recipe)
-                const suggestion = suggestPortion({
-                  perServingKcal: per.kcal,
-                  dailyGoal: plan.dailyCalories,
-                  eatenToday: 0,
-                  meal: picker.meal,
-                  mealEaten: 0,
-                  locale,
-                })
+                const selectedPeople = eaterIds
+                  .map((id) => planners.find((item) => item.id === id))
+                  .filter((item): item is Member => Boolean(item?.plan))
+                const preview =
+                  selectedPeople.length === 1
+                    ? String(servingsForPlan(recipe, selectedPeople[0].plan!.dailyCalories, picker.meal))
+                    : selectedPeople
+                        .map(
+                          (person) =>
+                            `${person.name} ${servingsForPlan(recipe, person.plan!.dailyCalories, picker.meal)}`,
+                        )
+                        .join(' · ')
                 return (
                   <button
                     key={recipe.id}
                     type="button"
                     className="recipe-chip"
-                    onClick={() => setSlot(picker.date, picker.meal, recipe.id, suggestion.servings)}
+                    disabled={eaterIds.length === 0}
+                    onClick={() => setDishForEaters(picker.date, picker.meal, recipe.id, eaterIds)}
                   >
                     <strong>{recipeName(recipe, locale)}</strong>
                     <span>
-                      {cuisineName(locale, recipeCuisine(recipe))} · {Math.round(per.kcal)} kcal ·{' '}
-                      {suggestion.servings}
+                      {cuisineName(locale, recipeCuisine(recipe))} · {Math.round(per.kcal)} kcal
+                      {preview ? ` · ${preview}` : ''}
                     </span>
                   </button>
                 )
@@ -586,6 +666,120 @@ export function WeekPlanView({ store, memberId, onSelectMember, onNeedPlan, onGo
           </div>
         </div>
       )}
+    </div>
+  )
+}
+
+function groupByRecipe(slots: WeekMealSlot[]): { recipeId: string; slots: WeekMealSlot[] }[] {
+  const order: string[] = []
+  const map = new Map<string, WeekMealSlot[]>()
+  for (const slot of slots) {
+    const list = map.get(slot.recipeId)
+    if (list) list.push(slot)
+    else {
+      map.set(slot.recipeId, [slot])
+      order.push(slot.recipeId)
+    }
+  }
+  return order.map((recipeId) => ({ recipeId, slots: map.get(recipeId) ?? [] }))
+}
+
+function DishGroup({
+  locale,
+  recipe,
+  groupSlots,
+  household,
+  showNames,
+  onUpdateServings,
+  onClearSlot,
+  onClearGroup,
+  onChange,
+}: {
+  locale: AppStore['locale']
+  recipe: Recipe
+  groupSlots: WeekMealSlot[]
+  household: Member[]
+  showNames: boolean
+  onUpdateServings: (slotId: string, servings: number) => void
+  onClearSlot: (slotId: string) => void
+  onClearGroup: () => void
+  onChange: () => void
+}) {
+  const totalMacros = groupSlots.reduce(
+    (acc, slot) => {
+      const part = scaleMacros(recipePerServingMacros(recipe), slot.servings)
+      return {
+        kcal: acc.kcal + part.kcal,
+        protein: acc.protein + part.protein,
+        carbs: acc.carbs + part.carbs,
+        fat: acc.fat + part.fat,
+      }
+    },
+    { kcal: 0, protein: 0, carbs: 0, fat: 0 },
+  )
+
+  return (
+    <div className="week-slot-body week-dish-group">
+      <div className="week-slot-copy">
+        <strong>{recipeName(recipe, locale)}</strong>
+        <p>{formatMacrosLine(totalMacros)}</p>
+      </div>
+      <ul className="week-eaters">
+        {groupSlots.map((slot) => {
+          const person = household.find((item) => item.id === slot.memberId)
+          const macros = scaleMacros(recipePerServingMacros(recipe), slot.servings)
+          return (
+            <li key={slot.id} className="week-eater">
+              {showNames && (
+                <span className="week-eater-name">{person?.name ?? slot.memberId}</span>
+              )}
+              <div className="eater-stepper">
+                <button
+                  type="button"
+                  className="btn btn-ghost btn-sm"
+                  onClick={() => onUpdateServings(slot.id, roundServings(slot.servings - 0.25))}
+                  aria-label="−"
+                >
+                  −
+                </button>
+                <span className="week-servings">{slot.servings}</span>
+                <button
+                  type="button"
+                  className="btn btn-ghost btn-sm"
+                  onClick={() => onUpdateServings(slot.id, roundServings(Math.min(3, slot.servings + 0.25)))}
+                  aria-label="+"
+                >
+                  +
+                </button>
+              </div>
+              <span className="week-eater-kcal">{Math.round(macros.kcal)} kcal</span>
+              {showNames && (
+                <button
+                  type="button"
+                  className="btn btn-ghost btn-icon icon-danger"
+                  onClick={() => onClearSlot(slot.id)}
+                  aria-label={t(locale, 'removeEaterFromMeal', { name: person?.name ?? '' })}
+                >
+                  <Trash2 size={14} />
+                </button>
+              )}
+            </li>
+          )
+        })}
+      </ul>
+      <div className="week-slot-actions">
+        <button type="button" className="btn btn-ghost btn-sm" onClick={onChange}>
+          {t(locale, 'changeDish')}
+        </button>
+        <button
+          type="button"
+          className="btn btn-ghost btn-icon icon-danger"
+          onClick={onClearGroup}
+          aria-label={t(locale, 'clearSlot')}
+        >
+          <Trash2 size={15} />
+        </button>
+      </div>
     </div>
   )
 }

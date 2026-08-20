@@ -2954,6 +2954,43 @@ tbody tr:hover td {
   border-color: var(--primary);
 }
 
+.week-slot-groups {
+  display: grid;
+  gap: 0.55rem;
+}
+
+.week-dish-group {
+  flex-direction: column;
+  align-items: stretch;
+}
+
+.week-eaters {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 0.3rem;
+}
+
+.week-eater {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.35rem 0.55rem;
+}
+
+.week-eater-name {
+  min-width: 4.5rem;
+  font-size: 0.8rem;
+  font-weight: 700;
+}
+
+.week-eater-kcal {
+  font-size: 0.74rem;
+  color: var(--text-muted);
+  font-family: var(--font-mono);
+}
+
 .week-shop-layout {
   display: grid;
   gap: 1rem;

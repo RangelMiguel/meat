@@ -144,14 +144,26 @@ function pickRecipe(recipes: Recipe[], meal: MealType, recentIds: Set<string>): 
   return list[Math.floor(Math.random() * list.length)]
 }
 
-/** Fill Mon–Sun meal slots from the catalog. Portions follow the calorie plan, not today’s log. */
+export function servingsForPlan(recipe: Recipe, dailyCalories: number, meal: MealType): number {
+  const per = recipePerServingMacros(recipe)
+  return suggestPortion({
+    perServingKcal: per.kcal,
+    dailyGoal: dailyCalories,
+    eatenToday: 0,
+    meal,
+    mealEaten: 0,
+  }).servings
+}
+
+/** Fill Mon–Sun meal slots from the catalog. Same dishes for every member; portions follow each plan. */
 export function buildRandomWeekPlan(opts: {
   weekStart: string
-  memberId: string
-  dailyCalories: number
+  members: { id: string; dailyCalories: number }[]
   recipes: Recipe[]
   meals?: MealType[]
 }): WeekMealSlot[] {
+  const people = opts.members.filter((item) => item.dailyCalories > 0)
+  if (!people.length) return []
   const meals = opts.meals ?? RANDOM_WEEK_MEALS
   const days = weekDates(opts.weekStart)
   const slots: WeekMealSlot[] = []
@@ -160,22 +172,16 @@ export function buildRandomWeekPlan(opts: {
     for (const meal of meals) {
       const recipe = pickRecipe(opts.recipes, meal, new Set(recent.slice(-6)))
       if (!recipe) continue
-      const per = recipePerServingMacros(recipe)
-      const suggestion = suggestPortion({
-        perServingKcal: per.kcal,
-        dailyGoal: opts.dailyCalories,
-        eatenToday: 0,
-        meal,
-        mealEaten: 0,
-      })
-      slots.push({
-        id: uid(),
-        date,
-        meal,
-        recipeId: recipe.id,
-        servings: suggestion.servings,
-        memberId: opts.memberId,
-      })
+      for (const person of people) {
+        slots.push({
+          id: uid(),
+          date,
+          meal,
+          recipeId: recipe.id,
+          servings: servingsForPlan(recipe, person.dailyCalories, meal),
+          memberId: person.id,
+        })
+      }
       recent.push(recipe.id)
     }
   }
