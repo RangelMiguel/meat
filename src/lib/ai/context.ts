@@ -1,6 +1,7 @@
-import { getIngredient } from '../../data/catalog'
+import { getIngredient, RECIPES } from '../../data/catalog'
 import { todayKey } from '../calories'
 import { prisma } from '../db'
+import { findMergedRecipe, parseCustomRecipes, parseRecipeOverrides } from '../recipeLibrary'
 import { mondayOf, parseWeekPlan, slotsInWeek } from '../weekPlan'
 import type { CaloriePlan } from '../../types'
 import { redactForModel } from './privacy'
@@ -48,6 +49,23 @@ export async function buildMeatContext(userId: string): Promise<string> {
     )
   }
 
+  const householdPeople = await prisma.member.findMany({
+    where: { householdId: member.householdId },
+    select: { id: true, planJson: true },
+  })
+  if (householdPeople.length > 1) {
+    lines.push('Household calorie plans (use You / Member N in tools, never names):')
+    for (const row of householdPeople) {
+      const alias = privacy.members.find((item) => item.id === row.id)?.alias ?? 'Member'
+      const personPlan = parsePlan(row.planJson)
+      lines.push(
+        personPlan
+          ? `- ${alias}: ${personPlan.dailyCalories} kcal/day · goal ${personPlan.input.goal}`
+          : `- ${alias}: no calorie plan`,
+      )
+    }
+  }
+
   const todayFood = member.entries.filter((e) => e.date === today)
   const todayKcal = todayFood.reduce((s, e) => s + e.kcal, 0)
   lines.push(`Today eaten: ${Math.round(todayKcal)} kcal, ${todayFood.length} items`)
@@ -80,10 +98,20 @@ export async function buildMeatContext(userId: string): Promise<string> {
     const week = parseWeekPlan(safeJson(kitchen.weekPlanJson))
     const planned = slotsInWeek(week.slots, mondayOf(today))
     if (planned.length) {
+      const custom = parseCustomRecipes(safeJson(kitchen.recipesJson))
+      const overrides = parseRecipeOverrides(safeJson(kitchen.overridesJson))
       lines.push('This week’s meal plan (a plan only — not logged as eaten):')
-      for (const slot of planned.slice(0, 28)) {
-        lines.push(`- ${slot.date} ${slot.meal}: recipe ${slot.recipeId} × ${slot.servings}`)
+      for (const slot of planned.slice(0, 56)) {
+        const recipe =
+          findMergedRecipe(slot.recipeId, custom, overrides) ||
+          RECIPES.find((item) => item.id === slot.recipeId)
+        const who = privacy.members.find((item) => item.id === slot.memberId)?.alias ?? 'Member'
+        lines.push(
+          `- ${slot.date} ${slot.meal}: ${recipe?.name ?? slot.recipeId} × ${slot.servings} (${who})`,
+        )
       }
+    } else {
+      lines.push('This week’s meal plan is empty. Use plan_week or add_week_meal to fill it.')
     }
     if (kitchen.inventory.length) {
       lines.push('Inventory (on hand):')

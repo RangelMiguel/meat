@@ -16,7 +16,8 @@ const TOOL_RULES = [
   'If Open Food Facts has no match, then call lookup_nutrition (it may estimate). Say when a number is an estimate.',
   'After a good Open Food Facts match, call save_packaged_food so the snack can be logged later.',
   'Use add_recipe to create cooked dishes and update_recipe to change existing ones.',
-  'After the first turn there is no snapshot — use list_* / search_* / search_open_food_facts if you need current or product numbers.',
+  'To create a week of meals, call list_household_plans then plan_week (mode random for a full household week, or mode set with slots). Use add_week_meal / remove_week_meal for one meal. Portions are sized per person. That plan does not log food as eaten.',
+  'After the first turn there is no snapshot — use list_* / search_* / search_open_food_facts / list_week_plan if you need current or product numbers.',
   'Confirm what was actually saved using the tool result.',
   'Never ask for or repeat personal names, emails, phones, keys, or account numbers. Refer to people as You / Member N.',
 ].join('\n')

@@ -1,6 +1,6 @@
 import { getIngredient, INGREDIENTS, macrosForAmount, RECIPES } from '../../data/catalog'
 import type { Cuisine, Recipe } from '../../data/types'
-import { todayKey } from '../calories'
+import { todayKey, uid } from '../calories'
 import { prisma } from '../db'
 import {
   findIngredient,
@@ -10,7 +10,16 @@ import {
   snackIngredientId,
 } from '../customIngredients'
 import { findMergedRecipe, mergeRecipeLibrary, parseCustomRecipes, parseRecipeOverrides } from '../recipeLibrary'
-import { parseWeekPlan } from '../weekPlan'
+import {
+  addDays,
+  buildRandomWeekPlan,
+  mondayOf,
+  parseWeekPlan,
+  servingsForPlan,
+  slotsInWeek,
+} from '../weekPlan'
+import { loadMeatPrivacy } from './privacyBook'
+import type { CaloriePlan, MealType, WeekMealSlot } from '../../types'
 import { isModuleInstalled } from '../modules/access'
 import { formatOpenFoodFactsProduct, fetchProductByBarcode, searchOpenFoodFacts } from '../nutrition/openFoodFacts'
 import { lookupNutrition } from '../nutrition/lookup'
@@ -50,11 +59,16 @@ export const MEAT_TOOLS: ToolSpec[] = [
   },
   {
     name: 'search_recipes',
-    description: 'Search catalog and household recipes by name.',
+    description: 'Search catalog and household recipes by name, meal, category, or cuisine.',
     parameters: {
       type: 'object',
-      properties: { query: { type: 'string' }, limit: { type: 'number' } },
-      required: ['query'],
+      properties: {
+        query: { type: 'string' },
+        meal: { type: 'string', enum: ['Breakfast', 'Lunch', 'Dinner', 'Snack'] },
+        category: { type: 'string' },
+        cuisine: { type: 'string', enum: ['mexican', 'american', 'italian', 'chinese'] },
+        limit: { type: 'number' },
+      },
       additionalProperties: false,
     },
   },
@@ -246,17 +260,94 @@ export const MEAT_TOOLS: ToolSpec[] = [
     },
   },
   {
+    name: 'list_household_plans',
+    description:
+      'List household members as You / Member N with calorie targets. Use these aliases in week-planning tools. Never use personal names.',
+    parameters: { type: 'object', properties: {}, additionalProperties: false },
+  },
+  {
+    name: 'list_week_plan',
+    description:
+      'List planned meals for a week (a plan only — not eaten). Includes recipe names, servings, and You / Member N.',
+    parameters: {
+      type: 'object',
+      properties: {
+        weekStart: { type: 'string', description: 'Monday YYYY-MM-DD; defaults to this week' },
+      },
+      additionalProperties: false,
+    },
+  },
+  {
     name: 'add_week_meal',
-    description: 'Add a meal slot to this week’s plan without wiping other slots.',
+    description:
+      'Add or replace one meal on the week plan. Defaults to You. Pass members "all" (or You / Member N) to size the same dish from each person’s calorie plan.',
     parameters: {
       type: 'object',
       properties: {
         date: { type: 'string', description: 'YYYY-MM-DD' },
         meal: { type: 'string', enum: ['Breakfast', 'Lunch', 'Dinner', 'Snack'] },
         recipe: { type: 'string', description: 'Recipe id or name' },
-        servings: { type: 'number' },
+        servings: { type: 'number', description: 'If omitted, sized from each person’s plan' },
+        members: {
+          type: 'string',
+          description: '"you", "all", or comma-separated You / Member N',
+        },
       },
       required: ['date', 'meal', 'recipe'],
+      additionalProperties: false,
+    },
+  },
+  {
+    name: 'remove_week_meal',
+    description: 'Remove a meal from the week plan for You, selected members, or everyone.',
+    parameters: {
+      type: 'object',
+      properties: {
+        date: { type: 'string', description: 'YYYY-MM-DD' },
+        meal: { type: 'string', enum: ['Breakfast', 'Lunch', 'Dinner', 'Snack'] },
+        members: { type: 'string', description: '"you", "all", or comma-separated You / Member N' },
+      },
+      required: ['date', 'meal'],
+      additionalProperties: false,
+    },
+  },
+  {
+    name: 'plan_week',
+    description:
+      'Create or replace a full week of meals in one call. Use mode "random" for a Monday–Sunday household draft (same dishes, personal portions), or mode "set" with a slots list. Does not log food as eaten.',
+    parameters: {
+      type: 'object',
+      properties: {
+        weekStart: { type: 'string', description: 'Monday YYYY-MM-DD; defaults to this week' },
+        members: {
+          type: 'string',
+          description: '"you", "all" (default when several people have plans), or comma-separated You / Member N',
+        },
+        mode: { type: 'string', enum: ['random', 'set'] },
+        meals: {
+          type: 'array',
+          items: { type: 'string', enum: ['Breakfast', 'Lunch', 'Dinner', 'Snack'] },
+          description: 'For random mode. Defaults to Breakfast, Lunch, Dinner',
+        },
+        replace: {
+          type: 'boolean',
+          description: 'Replace existing dishes for those people this week (default true)',
+        },
+        slots: {
+          type: 'array',
+          description: 'For set mode: dishes to assign',
+          items: {
+            type: 'object',
+            properties: {
+              date: { type: 'string' },
+              meal: { type: 'string', enum: ['Breakfast', 'Lunch', 'Dinner', 'Snack'] },
+              recipe: { type: 'string' },
+              servings: { type: 'number' },
+            },
+            required: ['date', 'meal', 'recipe'],
+          },
+        },
+      },
       additionalProperties: false,
     },
   },
@@ -315,10 +406,6 @@ async function needAddon(userId: string, moduleId: string): Promise<ToolExecResu
 
 export async function executeMeatTool(ctx: MeatToolContext, call: ToolCallRequest): Promise<ToolExecResult> {
   const args = call.arguments ?? {}
-  if (call.name === 'add_week_meal') {
-    const blocked = await needAddon(ctx.userId, 'week')
-    if (blocked) return blocked
-  }
   if (call.name === 'log_exercise') {
     const blocked = await needAddon(ctx.userId, 'exercise')
     if (blocked) return blocked
@@ -327,7 +414,14 @@ export async function executeMeatTool(ctx: MeatToolContext, call: ToolCallReques
     case 'search_ingredients':
       return searchIngredients(ctx, str(args.query), num(args.limit))
     case 'search_recipes':
-      return searchRecipes(ctx, str(args.query), num(args.limit))
+      return searchRecipes(
+        ctx,
+        str(args.query),
+        num(args.limit),
+        str(args.meal),
+        str(args.category),
+        str(args.cuisine),
+      )
     case 'list_inventory':
       return listInventory(ctx)
     case 'list_shopping_list':
@@ -350,8 +444,16 @@ export async function executeMeatTool(ctx: MeatToolContext, call: ToolCallReques
       return addInventory(ctx, args)
     case 'add_to_shopping_list':
       return addShopping(ctx, args)
+    case 'list_household_plans':
+      return listHouseholdPlans(ctx)
+    case 'list_week_plan':
+      return listWeekPlan(ctx, args)
     case 'add_week_meal':
       return addWeekMeal(ctx, args)
+    case 'remove_week_meal':
+      return removeWeekMeal(ctx, args)
+    case 'plan_week':
+      return planWeek(ctx, args)
     case 'log_exercise':
       return logExercise(ctx, args)
     case 'log_weight':
@@ -488,24 +590,38 @@ async function kitchenPayload(userId: string) {
   }
 }
 
-async function searchRecipes(ctx: MeatToolContext, query?: string, limit?: number): Promise<ToolExecResult> {
-  if (!query) return { ok: false, summary: 'query is required', error: 'query' }
+async function searchRecipes(
+  ctx: MeatToolContext,
+  query?: string,
+  limit?: number,
+  meal?: string,
+  category?: string,
+  cuisine?: string,
+): Promise<ToolExecResult> {
   const { recipes } = await kitchenPayload(ctx.userId)
   const take = Math.min(Math.max(limit ?? 10, 1), 20)
-  const hits = recipes
+  const mealCats = meal ? MEAL_RECIPE_CATEGORIES[meal as MealType] : undefined
+  const scored = recipes
+    .filter((recipe) => {
+      if (category && recipe.category !== category) return false
+      if (cuisine && (recipe.cuisine ?? 'mexican') !== cuisine) return false
+      if (mealCats && !mealCats.includes(recipe.category)) return false
+      return true
+    })
     .map((recipe) => ({
       id: recipe.id,
       name: recipe.name,
       nameEs: recipe.nameEs,
       servings: recipe.servings,
       category: recipe.category,
-      score: bestScore(query, [recipe.id, recipe.name, recipe.nameEs]),
+      cuisine: recipe.cuisine ?? 'mexican',
+      score: query ? bestScore(query, [recipe.id, recipe.name, recipe.nameEs, recipe.category]) : 70,
     }))
     .filter((row) => row.score >= 50)
     .sort((a, b) => b.score - a.score)
     .slice(0, take)
     .map(({ score: _score, ...row }) => row)
-  return { ok: true, summary: `${hits.length} recipes`, data: hits }
+  return { ok: true, summary: `${scored.length} recipes`, data: scored }
 }
 
 async function listInventory(ctx: MeatToolContext): Promise<ToolExecResult> {
@@ -917,16 +1033,59 @@ async function addShopping(ctx: MeatToolContext, args: Record<string, unknown>):
   }
 }
 
+async function listHouseholdPlans(ctx: MeatToolContext): Promise<ToolExecResult> {
+  const household = await householdPeople(ctx.userId)
+  if (!household) return { ok: false, summary: 'Household not found', error: 'household' }
+  const people = household.people.map((person) => ({
+    member: person.alias,
+    dailyCalories: person.dailyCalories,
+    hasPlan: person.dailyCalories != null,
+  }))
+  return {
+    ok: true,
+    summary: `${people.filter((item) => item.hasPlan).length} of ${people.length} have a calorie plan`,
+    data: people,
+  }
+}
+
+async function listWeekPlan(ctx: MeatToolContext, args: Record<string, unknown>): Promise<ToolExecResult> {
+  const household = await householdPeople(ctx.userId)
+  if (!household) return { ok: false, summary: 'Household not found', error: 'household' }
+  const { kitchen, custom, overrides } = await kitchenPayload(ctx.userId)
+  const weekStart = mondayOf(validDate(str(args.weekStart)) || todayKey())
+  const weekEnd = addDays(weekStart, 6)
+  const week = parseWeekPlan(safeJson(kitchen.weekPlanJson))
+  const slots = slotsInWeek(week.slots, weekStart).map((slot) => {
+    const recipe = resolveRecipe(slot.recipeId, custom, overrides)
+    const person = household.people.find((item) => item.id === slot.memberId)
+    return {
+      date: slot.date,
+      meal: slot.meal,
+      recipeId: slot.recipeId,
+      recipe: recipe.ok ? recipe.recipe.name : slot.recipeId,
+      servings: slot.servings,
+      member: person?.alias ?? 'Member',
+    }
+  })
+  return {
+    ok: true,
+    summary: `${slots.length} planned dishes ${weekStart} to ${weekEnd}`,
+    data: { weekStart, weekEnd, slots },
+  }
+}
+
 async function addWeekMeal(ctx: MeatToolContext, args: Record<string, unknown>): Promise<ToolExecResult> {
   const date = validDate(str(args.date))
-  const meal = str(args.meal)
+  const meal = parseMeal(str(args.meal))
   const recipeHint = str(args.recipe)
   if (!date) return { ok: false, summary: 'date must be YYYY-MM-DD', error: 'date' }
-  if (!meal || !MEALS.includes(meal as (typeof MEALS)[number])) {
-    return { ok: false, summary: 'meal must be Breakfast, Lunch, Dinner, or Snack', error: 'meal' }
-  }
+  if (!meal) return { ok: false, summary: 'meal must be Breakfast, Lunch, Dinner, or Snack', error: 'meal' }
   if (!recipeHint) return { ok: false, summary: 'recipe is required', error: 'recipe' }
-  const { member, kitchen, custom, overrides } = await kitchenPayload(ctx.userId)
+  const household = await householdPeople(ctx.userId)
+  if (!household) return { ok: false, summary: 'Household not found', error: 'household' }
+  const people = resolvePeople(household, args.members, [household.you])
+  if (!people.length) return { ok: false, summary: 'No matching household members with a plan', error: 'members' }
+  const { kitchen, custom, overrides } = await kitchenPayload(ctx.userId)
   const recipe = resolveRecipe(recipeHint, custom, overrides)
   if (!recipe.ok) {
     return {
@@ -937,24 +1096,154 @@ async function addWeekMeal(ctx: MeatToolContext, args: Record<string, unknown>):
     }
   }
   const week = parseWeekPlan(safeJson(kitchen.weekPlanJson))
-  const servings = Math.max(1, num(args.servings) ?? 1)
-  const slot = {
-    id: `ai-${Date.now().toString(36)}`,
+  const forced = num(args.servings)
+  const ids = new Set(people.map((item) => item.id))
+  const keep = week.slots.filter(
+    (slot) => !(slot.date === date && slot.meal === meal && ids.has(slot.memberId)),
+  )
+  const added = people.map((person) => ({
+    id: uid(),
     date,
     meal,
     recipeId: recipe.recipe.id,
-    servings,
-    memberId: member.id,
-  }
-  await mutateWorkspace(ctx.userId, {
-    action: 'saveWeekPlan',
-    slots: [...week.slots, slot],
-  })
+    servings:
+      forced != null && forced > 0
+        ? forced
+        : servingsForPlan(recipe.recipe, person.dailyCalories ?? 0, meal),
+    memberId: person.id,
+  }))
+  await mutateWorkspace(ctx.userId, { action: 'saveWeekPlan', slots: [...keep, ...added] })
   return {
     ok: true,
     mutated: true,
-    summary: `Planned ${recipe.recipe.name} for ${meal} on ${date}`,
-    data: slot,
+    summary: `Planned ${recipe.recipe.name} for ${meal} on ${date} · ${people.map((item) => item.alias).join(', ')}`,
+    data: added.map((slot) => ({
+      date: slot.date,
+      meal: slot.meal,
+      recipe: recipe.recipe.name,
+      servings: slot.servings,
+      member: people.find((item) => item.id === slot.memberId)?.alias,
+    })),
+  }
+}
+
+async function removeWeekMeal(ctx: MeatToolContext, args: Record<string, unknown>): Promise<ToolExecResult> {
+  const date = validDate(str(args.date))
+  const meal = parseMeal(str(args.meal))
+  if (!date) return { ok: false, summary: 'date must be YYYY-MM-DD', error: 'date' }
+  if (!meal) return { ok: false, summary: 'meal must be Breakfast, Lunch, Dinner, or Snack', error: 'meal' }
+  const household = await householdPeople(ctx.userId)
+  if (!household) return { ok: false, summary: 'Household not found', error: 'household' }
+  const people = resolvePeople(household, args.members, [household.you])
+  if (!people.length) return { ok: false, summary: 'No matching household members', error: 'members' }
+  const { kitchen } = await kitchenPayload(ctx.userId)
+  const week = parseWeekPlan(safeJson(kitchen.weekPlanJson))
+  const ids = new Set(people.map((item) => item.id))
+  const next = week.slots.filter(
+    (slot) => !(slot.date === date && slot.meal === meal && ids.has(slot.memberId)),
+  )
+  const removed = week.slots.length - next.length
+  if (!removed) return { ok: true, summary: 'Nothing to remove', data: { removed: 0 } }
+  await mutateWorkspace(ctx.userId, { action: 'saveWeekPlan', slots: next })
+  return {
+    ok: true,
+    mutated: true,
+    summary: `Removed ${removed} ${meal} slot(s) on ${date}`,
+    data: { removed },
+  }
+}
+
+async function planWeek(ctx: MeatToolContext, args: Record<string, unknown>): Promise<ToolExecResult> {
+  const household = await householdPeople(ctx.userId)
+  if (!household) return { ok: false, summary: 'Household not found', error: 'household' }
+  const plannedPeople = household.people.filter((item) => item.dailyCalories)
+  const fallback = plannedPeople.length > 1 ? plannedPeople : household.you.dailyCalories ? [household.you] : []
+  const people = resolvePeople(household, args.members, fallback)
+  if (!people.length) {
+    return { ok: false, summary: 'Set a calorie plan before planning the week', error: 'plan' }
+  }
+  const { kitchen, custom, overrides, recipes } = await kitchenPayload(ctx.userId)
+  const weekStart = mondayOf(validDate(str(args.weekStart)) || todayKey())
+  const weekEnd = addDays(weekStart, 6)
+  const replace = args.replace !== false
+  const mode = str(args.mode) === 'set' || Array.isArray(args.slots) ? 'set' : 'random'
+  const week = parseWeekPlan(safeJson(kitchen.weekPlanJson))
+  const ids = new Set(people.map((item) => item.id))
+  const keep = week.slots.filter((slot) => {
+    const inWeek = slot.date >= weekStart && slot.date <= weekEnd
+    return !(inWeek && ids.has(slot.memberId) && replace)
+  })
+
+  let generated: WeekMealSlot[] = []
+  if (mode === 'random') {
+    const meals = Array.isArray(args.meals)
+      ? args.meals.map((item) => parseMeal(str(item))).filter((item): item is MealType => Boolean(item))
+      : undefined
+    generated = buildRandomWeekPlan({
+      weekStart,
+      members: people.map((item) => ({ id: item.id, dailyCalories: item.dailyCalories ?? 0 })),
+      recipes,
+      meals: meals?.length ? meals : undefined,
+    })
+  } else {
+    const rawSlots = Array.isArray(args.slots) ? args.slots : []
+    if (!rawSlots.length) return { ok: false, summary: 'slots is required for mode set', error: 'slots' }
+    const missing: string[] = []
+    for (const raw of rawSlots) {
+      const rec = asRecord(raw)
+      const date = validDate(str(rec.date))
+      const meal = parseMeal(str(rec.meal))
+      const recipeHint = str(rec.recipe)
+      if (!date || !meal || !recipeHint) continue
+      if (date < weekStart || date > weekEnd) continue
+      const recipe = resolveRecipe(recipeHint, custom, overrides)
+      if (!recipe.ok) {
+        missing.push(recipeHint)
+        continue
+      }
+      const forced = num(rec.servings)
+      for (const person of people) {
+        generated.push({
+          id: uid(),
+          date,
+          meal,
+          recipeId: recipe.recipe.id,
+          servings:
+            forced != null && forced > 0
+              ? forced
+              : servingsForPlan(recipe.recipe, person.dailyCalories ?? 0, meal),
+          memberId: person.id,
+        })
+      }
+    }
+    if (missing.length) {
+      return { ok: false, summary: `Unknown recipes: ${missing.join(', ')}`, error: 'recipe' }
+    }
+    if (!generated.length) return { ok: false, summary: 'No valid slots in that week', error: 'slots' }
+  }
+
+  if (!replace) {
+    const taken = new Set(
+      keep.filter((slot) => ids.has(slot.memberId)).map((slot) => `${slot.memberId}|${slot.date}|${slot.meal}`),
+    )
+    generated = generated.filter((slot) => !taken.has(`${slot.memberId}|${slot.date}|${slot.meal}`))
+  }
+
+  await mutateWorkspace(ctx.userId, { action: 'saveWeekPlan', slots: [...keep, ...generated] })
+  return {
+    ok: true,
+    mutated: true,
+    summary:
+      mode === 'random'
+        ? `Random week ${weekStart} to ${weekEnd} for ${people.map((item) => item.alias).join(', ')} · ${generated.length} dishes`
+        : `Set ${generated.length} dishes ${weekStart} to ${weekEnd} for ${people.map((item) => item.alias).join(', ')}`,
+    data: {
+      weekStart,
+      weekEnd,
+      mode,
+      members: people.map((item) => item.alias),
+      dishes: generated.length,
+    },
   }
 }
 
@@ -1128,6 +1417,97 @@ function num(value: unknown): number | undefined {
 
 function validDate(value?: string): string | undefined {
   return value && /^\d{4}-\d{2}-\d{2}$/.test(value) ? value : undefined
+}
+
+const MEAL_RECIPE_CATEGORIES: Record<MealType, string[]> = {
+  Breakfast: ['desayuno'],
+  Lunch: ['plato-fuerte', 'sopa', 'mariscos'],
+  Dinner: ['plato-fuerte', 'sopa', 'mariscos'],
+  Snack: ['antojito', 'postre'],
+}
+
+type HouseholdPerson = {
+  id: string
+  alias: string
+  dailyCalories: number | null
+}
+
+function parseMeal(value?: string): MealType | undefined {
+  if (!value) return undefined
+  return MEALS.includes(value as MealType) ? (value as MealType) : undefined
+}
+
+function parseCaloriePlan(raw: string | null): CaloriePlan | null {
+  if (!raw) return null
+  try {
+    const plan = JSON.parse(raw) as CaloriePlan
+    return plan && typeof plan === 'object' && plan.dailyCalories ? plan : null
+  } catch {
+    return null
+  }
+}
+
+async function householdPeople(
+  userId: string,
+): Promise<{ you: HouseholdPerson; people: HouseholdPerson[] } | null> {
+  const youRow = await prisma.member.findFirst({
+    where: { userId },
+    select: { id: true, householdId: true },
+  })
+  if (!youRow) return null
+  const privacy = await loadMeatPrivacy(userId)
+  const rows = await prisma.member.findMany({
+    where: { householdId: youRow.householdId },
+    select: { id: true, planJson: true },
+  })
+  const people = rows.map((row) => {
+    const plan = parseCaloriePlan(row.planJson)
+    return {
+      id: row.id,
+      alias: privacy.members.find((item) => item.id === row.id)?.alias ?? (row.id === youRow.id ? 'You' : 'Member'),
+      dailyCalories: plan?.dailyCalories ?? null,
+    }
+  })
+  const you = people.find((item) => item.id === youRow.id)
+  if (!you) return null
+  return { you, people }
+}
+
+function resolvePeople(
+  household: { you: HouseholdPerson; people: HouseholdPerson[] },
+  hint: unknown,
+  fallback: HouseholdPerson[],
+): HouseholdPerson[] {
+  if (hint == null || hint === '') return fallback.filter((item) => item.dailyCalories)
+  const tokens: string[] = []
+  if (Array.isArray(hint)) {
+    for (const item of hint) {
+      const value = str(item)
+      if (value) tokens.push(value)
+    }
+  } else {
+    const value = str(hint)
+    if (value) tokens.push(...value.split(',').map((part) => part.trim()).filter(Boolean))
+  }
+  if (!tokens.length) return fallback.filter((item) => item.dailyCalories)
+
+  const found: HouseholdPerson[] = []
+  for (const token of tokens) {
+    const key = token.toLowerCase()
+    if (key === 'all' || key === 'everyone' || key === 'household') {
+      return household.people.filter((item) => item.dailyCalories)
+    }
+    if (key === 'you' || key === 'me') {
+      if (household.you.dailyCalories) found.push(household.you)
+      continue
+    }
+    const match = household.people.find(
+      (item) => item.alias.toLowerCase() === key || item.id === token,
+    )
+    if (match) found.push(match)
+  }
+  const unique = new Map(found.map((item) => [item.id, item]))
+  return [...unique.values()].filter((item) => item.dailyCalories)
 }
 
 function asRecord(value: unknown): Record<string, unknown> {

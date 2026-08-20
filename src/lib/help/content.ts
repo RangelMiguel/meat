@@ -240,7 +240,7 @@ const en: HelpContent = {
           paragraphs: [
             'The assistant uses the provider and key you set in Settings (or a family-shared key). Each person still accepts the privacy notice.',
             'The first question in a chat sends a kitchen snapshot. Later turns do not repeat it—the assistant looks things up with tools instead.',
-            'It can search recipes, log food, update inventory, add to the shopping list, and save packaged snacks. It will not pretend it saved something it did not.',
+            'It can search recipes, log food, update inventory, add to the shopping list, save packaged snacks, and build a week plan for the household (same dishes, personal portions). It will not pretend it saved something it did not.',
           ],
           tips: [
             'Personal names, emails, phones, and keys are stripped before anything is sent to the model.',
@@ -474,7 +474,7 @@ const es: HelpContent = {
           paragraphs: [
             'El asistente usa el proveedor y la llave que pones en Ajustes (o la llave compartida de la familia). Cada persona acepta el aviso de privacidad.',
             'La primera pregunta de un chat envía un resumen de la cocina. Los turnos siguientes no lo repiten: el asistente consulta con herramientas.',
-            'Puede buscar recetas, registrar comida, actualizar inventario, agregar a la lista y guardar snacks. No finge que guardó algo si no lo hizo.',
+            'Puede buscar recetas, registrar comida, actualizar inventario, agregar a la lista, guardar snacks y armar el plan de la semana para el hogar (mismos platillos, porciones personales). No finge que guardó algo si no lo hizo.',
           ],
           tips: [
             'Nombres, correos, teléfonos y llaves se quitan antes de enviar nada al modelo.',
