@@ -59,7 +59,7 @@ export function Sidebar({
     { id: 'today', label: t(locale, 'navToday'), icon: Flame },
     { id: 'plan', label: t(locale, 'navPlan'), icon: ClipboardList },
     { id: 'progress', label: t(locale, 'navProgress'), icon: Scale },
-    { id: 'week', label: t(locale, 'navWeek'), icon: CalendarRange, addon: true },
+    { id: 'week', label: t(locale, 'navWeek'), icon: CalendarRange },
     { id: 'recipes', label: t(locale, 'navRecipes'), icon: BookOpen },
     { id: 'inventory', label: t(locale, 'navInventory'), icon: Package },
     { id: 'purchase', label: t(locale, 'navPurchase'), icon: ShoppingCart },

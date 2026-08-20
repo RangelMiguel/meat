@@ -1,7 +1,7 @@
 import { getIngredient } from '../../data/catalog'
 import { todayKey } from '../calories'
 import { prisma } from '../db'
-import { mondayOf, parseWeekPlan, upcomingSlots } from '../weekPlan'
+import { mondayOf, parseWeekPlan, slotsInWeek } from '../weekPlan'
 import type { CaloriePlan } from '../../types'
 import { redactForModel } from './privacy'
 import { loadMeatPrivacy } from './privacyBook'
@@ -78,10 +78,10 @@ export async function buildMeatContext(userId: string): Promise<string> {
   const kitchen = member.household.kitchen
   if (kitchen) {
     const week = parseWeekPlan(safeJson(kitchen.weekPlanJson))
-    const upcoming = upcomingSlots(week.slots, mondayOf(today), today)
-    if (upcoming.length) {
-      lines.push('Upcoming week meals:')
-      for (const slot of upcoming.slice(0, 20)) {
+    const planned = slotsInWeek(week.slots, mondayOf(today))
+    if (planned.length) {
+      lines.push('This week’s meal plan (a plan only — not logged as eaten):')
+      for (const slot of planned.slice(0, 28)) {
         lines.push(`- ${slot.date} ${slot.meal}: recipe ${slot.recipeId} × ${slot.servings}`)
       }
     }

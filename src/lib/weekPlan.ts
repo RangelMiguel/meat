@@ -5,9 +5,10 @@ import {
   clampGrams,
   formatAmount,
   todayKey,
+  uid,
   type MeasureUnit,
 } from './calories'
-import { recipeNeedsForServings } from './portions'
+import { recipeNeedsForServings, recipePerServingMacros, suggestPortion } from './portions'
 import type { MealType, PurchaseItem, WeekMealSlot, WeekPlan } from '../types'
 
 const MEALS: MealType[] = ['Breakfast', 'Lunch', 'Dinner', 'Snack']
@@ -119,6 +120,66 @@ export function upcomingSlots(
   const start = today > weekStart ? today : weekStart
   const end = addDays(weekStart, 6)
   return slots.filter((slot) => slot.date >= start && slot.date <= end)
+}
+
+/** Breakfast / lunch / dinner — snacks stay optional so a random week is easy to edit. */
+export const RANDOM_WEEK_MEALS: MealType[] = ['Breakfast', 'Lunch', 'Dinner']
+
+const MEAL_CATEGORIES: Record<MealType, string[]> = {
+  Breakfast: ['desayuno'],
+  Lunch: ['plato-fuerte', 'sopa', 'mariscos'],
+  Dinner: ['plato-fuerte', 'sopa', 'mariscos'],
+  Snack: ['antojito', 'postre'],
+}
+
+function pickRecipe(recipes: Recipe[], meal: MealType, recentIds: Set<string>): Recipe | undefined {
+  const preferred = recipes.filter((recipe) => MEAL_CATEGORIES[meal].includes(recipe.category))
+  const fallback = recipes.filter(
+    (recipe) => recipe.category !== 'salsa-side' && recipe.category !== 'bebida',
+  )
+  const pool = preferred.length ? preferred : fallback
+  if (!pool.length) return undefined
+  const fresh = pool.filter((recipe) => !recentIds.has(recipe.id))
+  const list = fresh.length ? fresh : pool
+  return list[Math.floor(Math.random() * list.length)]
+}
+
+/** Fill Mon–Sun meal slots from the catalog. Portions follow the calorie plan, not today’s log. */
+export function buildRandomWeekPlan(opts: {
+  weekStart: string
+  memberId: string
+  dailyCalories: number
+  recipes: Recipe[]
+  meals?: MealType[]
+}): WeekMealSlot[] {
+  const meals = opts.meals ?? RANDOM_WEEK_MEALS
+  const days = weekDates(opts.weekStart)
+  const slots: WeekMealSlot[] = []
+  const recent: string[] = []
+  for (const date of days) {
+    for (const meal of meals) {
+      const recipe = pickRecipe(opts.recipes, meal, new Set(recent.slice(-6)))
+      if (!recipe) continue
+      const per = recipePerServingMacros(recipe)
+      const suggestion = suggestPortion({
+        perServingKcal: per.kcal,
+        dailyGoal: opts.dailyCalories,
+        eatenToday: 0,
+        meal,
+        mealEaten: 0,
+      })
+      slots.push({
+        id: uid(),
+        date,
+        meal,
+        recipeId: recipe.id,
+        servings: suggestion.servings,
+        memberId: opts.memberId,
+      })
+      recent.push(recipe.id)
+    }
+  }
+  return slots
 }
 
 export type StoragePlace = 'fridge' | 'freezer' | 'pantry'

@@ -54,7 +54,7 @@ const en: HelpContent = {
           paragraphs: [
             'The sidebar lists the screens you can open. On a phone, use the menu button in the top bar.',
             'At the bottom of the sidebar you can switch language (EN / ES). Sign out ends this device’s session.',
-            'Week, Exercise, and History stay hidden until you install those modules in Marketplace.',
+            'Exercise and History stay hidden until you install those modules in Marketplace.',
           ],
           tips: [
             'If a menu item is missing, open Marketplace and install that module. Your data stays if you remove it later.',
@@ -113,18 +113,18 @@ const en: HelpContent = {
           paragraphs: [
             'The plan is personal. Enter age, height, weight, and activity, then choose a pace: lose weight fast, lose weight, maintain, gain weight, or gain weight fast.',
             'Meat turns that into daily calories and protein / carbs / fat. You can edit someone else’s plan if you are in the same household.',
-            'After you save a plan, you can pick meals for the week if that module is installed.',
+            'After you save a plan, open the week planner to pick meals for all seven days. That plan does not fill Today — you still log what you actually eat.',
           ],
         },
         {
           id: 'progress',
           title: 'Progress',
-          summary: 'Weigh-ins, a trend graph, and when to change calories.',
+          summary: 'This week’s meal plan, plus weigh-ins if you track weight.',
           view: 'progress',
           paragraphs: [
-            'Log your weight once a day. The same morning scale is best. Logging again on that day updates the number.',
-            'The graph shows the logged trend against the weekly change in your plan. Day-to-day swings of 0.5–1 kg from water and salt are normal.',
-            'After about two weeks, Meat can tell if you are losing or gaining too slowly and offer a lower or higher calorie target. If your current weight is well off the weight stored in the plan, it will offer to recalculate BMR and intake.',
+            'Progress opens with the meals you planned for this week. That list is a plan, not a food log — change any dish when the week changes.',
+            'You can also log your weight once a day. The same morning scale is best. Logging again on that day updates the number.',
+            'The graph shows the logged trend against the weekly change in your calorie plan. After about two weeks, Meat can offer a lower or higher calorie target if the trend is off.',
           ],
           tips: [
             'The first time you save a plan, that starting weight is logged automatically.',
@@ -156,12 +156,12 @@ const en: HelpContent = {
         {
           id: 'purchase',
           title: 'Purchase',
-          summary: 'Shopping list, then mark the shop bought.',
+          summary: 'Shopping list, then record what you actually bought and paid.',
           view: 'purchase',
           paragraphs: [
-            'The purchase list is what you still need. Add items by hand or let the week planner fill it from planned meals minus inventory.',
-            'When you mark the shop complete, those items move into inventory. If Finance is connected, Meat asks how much you spent and posts that expense.',
-            'You can finish the shop without sending money if Finance is down or you want to log the spend later.',
+            'The purchase list is what you still need. Add items by hand or let the week planner fill it from the full week’s meals minus inventory.',
+            'Open shop mode when you get back from the store. Adjust the real quantity of each item and set its price, then save. Bought items move into inventory; unchecked items stay on the list.',
+            'If Finance is connected, the sum of those prices is posted as the expense. You can finish the shop without sending money if you want to log the spend later.',
           ],
           tips: ['Set the Finance URL and key in Settings, then use Test connection before the first shop.'],
         },
@@ -178,8 +178,8 @@ const en: HelpContent = {
           summary: 'Install or remove Week, Exercise, and History.',
           view: 'marketplace',
           paragraphs: [
-            'Core screens (Today, Plan, Progress, Recipes, Inventory, Purchase, Settings, AI, Help) are always there.',
-            'Week planner, Exercise, and History are add-ons. Install them here so they appear in the menu.',
+            'Core screens (Today, Plan, Progress, Week, Recipes, Inventory, Purchase, Settings, AI, Help) are always there.',
+            'Exercise and History are add-ons. Install them here so they appear in the menu.',
             'Removing a module hides it. The data stays, so installing it again brings the screen back.',
           ],
         },
@@ -189,9 +189,9 @@ const en: HelpContent = {
           summary: 'Pick meals, compute the shop, and pack the fridge.',
           view: 'week',
           paragraphs: [
-            'Choose dishes for each day and meal. Meat sizes portions from each person’s plan.',
-            'It then builds a shopping list minus what is already in inventory, and tells you what belongs in the fridge versus freezer bags.',
-            'You can add a planned meal to the list without wiping the rest of the week.',
+            'Choose dishes for each day of the week, or tap Random week for a full Monday–Sunday draft. Meat sizes portions from each person’s calorie plan, not from today’s food log.',
+            'The shopping list covers the whole week minus what is already in inventory, and tells you what belongs in the fridge versus freezer bags.',
+            'The week is a living plan. Change any meal later — it never auto-logs those dishes on Today.',
           ],
         },
         {
@@ -228,7 +228,7 @@ const en: HelpContent = {
           paragraphs: [
             'In Finance, an admin generates a Meat connection key and picks the paying account or card and a category.',
             'In Meat → Settings, paste the Finance URL and that key, then test the connection.',
-            'After a shop, enter what you paid. Meat posts the expense; the groceries still go into inventory even if the send fails.',
+            'After a shop, set a price on each item. Meat posts the sum as the expense; the groceries still go into inventory even if the send fails.',
           ],
           tips: ['The Apps menu needs the Finance URL (or the URL saved on this connection) to open Finance.'],
         },
@@ -288,7 +288,7 @@ const es: HelpContent = {
           paragraphs: [
             'La barra lateral lista las pantallas. En el teléfono se abre con el botón de menú de arriba.',
             'Abajo puedes cambiar el idioma (EN / ES). Cerrar sesión termina la sesión de este dispositivo.',
-            'Semana, Ejercicio e Historial se ocultan hasta que instalas esos módulos en Marketplace.',
+            'Ejercicio e Historial se ocultan hasta que instalas esos módulos en Marketplace.',
           ],
           tips: [
             'Si falta un ítem del menú, ábrelo en Marketplace e instálalo. Los datos se quedan si luego lo quitas.',
@@ -347,18 +347,18 @@ const es: HelpContent = {
           paragraphs: [
             'El plan es personal. Pon edad, estatura, peso y actividad, y elige un ritmo: bajar rápido, bajar, mantener, subir o subir rápido.',
             'Meat lo convierte en calorías del día y proteína / carbos / grasa. Puedes editar el plan de otra persona del mismo hogar.',
-            'Después de guardar, puedes elegir comidas de la semana si ese módulo está instalado.',
+            'Después de guardar, abre el plan semanal para elegir comidas de los siete días. Ese plan no llena Hoy: sigues registrando lo que de verdad comes.',
           ],
         },
         {
           id: 'progress',
           title: 'Progreso',
-          summary: 'Pesajes, gráfica de tendencia y cuándo cambiar las calorías.',
+          summary: 'El plan de comidas de la semana, y el peso si lo registras.',
           view: 'progress',
           paragraphs: [
-            'Registra el peso una vez al día. Mejor a la misma hora, por la mañana. Si vuelves a guardar ese día, se actualiza el número.',
-            'La gráfica compara la tendencia registrada con el cambio semanal de tu plan. Subidas y bajadas de 0.5–1 kg por agua y sal son normales.',
-            'Tras unas dos semanas, Meat puede ver si bajas o subes demasiado lento y ofrecer una meta de calorías más baja o más alta. Si tu peso actual se alejó del peso guardado en el plan, ofrece recalcular el BMR y las calorías.',
+            'Progreso abre con las comidas que planeaste esta semana. Esa lista es un plan, no un registro: cambia cualquier platillo cuando cambie la semana.',
+            'También puedes registrar el peso una vez al día. Mejor a la misma hora, por la mañana. Si vuelves a guardar ese día, se actualiza el número.',
+            'La gráfica compara la tendencia con el cambio semanal de tu plan de calorías. Tras unas dos semanas, Meat puede ofrecer una meta más baja o más alta si la tendencia se desvía.',
           ],
           tips: [
             'La primera vez que guardas un plan, ese peso inicial se registra solo.',
@@ -390,12 +390,12 @@ const es: HelpContent = {
         {
           id: 'purchase',
           title: 'Compras',
-          summary: 'Lista de compras y marcar el súper como hecho.',
+          summary: 'Lista de compras y anotar lo que de verdad compraste y pagaste.',
           view: 'purchase',
           paragraphs: [
-            'La lista es lo que aún falta. Agrégala a mano o deja que el plan semanal la arme con las comidas menos el inventario.',
-            'Al marcar la compra como hecha, esos artículos pasan al inventario. Si Finance está conectado, Meat pregunta cuánto pagaste y registra el gasto.',
-            'Puedes terminar la compra sin enviar el dinero si Finance no responde o quieres registrarlo después.',
+            'La lista es lo que aún falta. Agrégala a mano o deja que el plan semanal la arme con toda la semana menos el inventario.',
+            'Abre el modo compra al volver del súper. Ajusta la cantidad real de cada cosa y pon su precio, luego guarda. Lo comprado pasa al inventario; lo desmarcado se queda en la lista.',
+            'Si Finance está conectado, la suma de esos precios se registra como gasto. Puedes terminar la compra sin enviar el dinero si quieres registrarlo después.',
           ],
           tips: ['Pon la URL y la llave de Finance en Ajustes y usa Probar conexión antes de la primera compra.'],
         },
@@ -409,11 +409,11 @@ const es: HelpContent = {
         {
           id: 'marketplace',
           title: 'Marketplace',
-          summary: 'Instala o quita Semana, Ejercicio e Historial.',
+          summary: 'Instala o quita Ejercicio e Historial.',
           view: 'marketplace',
           paragraphs: [
-            'Las pantallas base (Hoy, Plan, Progreso, Recetas, Inventario, Compras, Ajustes, IA, Ayuda) siempre están.',
-            'Semana, Ejercicio e Historial son extras. Instálalos aquí para que aparezcan en el menú.',
+            'Las pantallas base (Hoy, Plan, Progreso, Semana, Recetas, Inventario, Compras, Ajustes, IA, Ayuda) siempre están.',
+            'Ejercicio e Historial son extras. Instálalos aquí para que aparezcan en el menú.',
             'Quitar un módulo lo oculta. Los datos se quedan, así que al instalarlo otra vez vuelve la pantalla.',
           ],
         },
@@ -423,9 +423,9 @@ const es: HelpContent = {
           summary: 'Elige comidas, calcula la compra y empaca el refri.',
           view: 'week',
           paragraphs: [
-            'Elige platillos por día y comida. Meat ajusta las porciones con el plan de cada persona.',
-            'Luego arma la lista de compras menos lo que ya hay, y te dice qué va al refrigerador y qué en bolsas al congelador.',
-            'Puedes agregar una comida a la semana sin borrar el resto.',
+            'Elige platillos para cada día de la semana, o toca Semana al azar para un borrador de lunes a domingo. Meat ajusta las porciones con el plan de calorías, no con lo que ya registraste hoy.',
+            'La lista de compras cubre toda la semana menos lo que ya hay, y te dice qué va al refrigerador y qué en bolsas al congelador.',
+            'La semana es un plan vivo. Cambia cualquier comida después: nunca registra esos platillos sola en Hoy.',
           ],
         },
         {
@@ -462,7 +462,7 @@ const es: HelpContent = {
           paragraphs: [
             'En Finance, un admin genera una llave de conexión Meat y elige la cuenta o tarjeta que paga y una categoría.',
             'En Meat → Ajustes pega la URL de Finance y esa llave, y prueba la conexión.',
-            'Después de la compra, escribe lo que pagaste. Meat registra el gasto; la despensa se actualiza aunque el envío falle.',
+            'Después de la compra, pon el precio de cada cosa. Meat registra la suma como gasto; la despensa se actualiza aunque el envío falle.',
           ],
           tips: ['El menú de Apps necesita la URL de Finance (o la guardada en esta conexión) para abrirla.'],
         },

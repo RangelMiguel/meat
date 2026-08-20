@@ -80,13 +80,22 @@ export function normalizeFinanceUrl(raw: string): string {
   return raw.trim().replace(/\/+$/, '')
 }
 
-export function purchaseItemsForFinance(items: PurchaseItem[]): { name: string; grams: number }[] {
+export function purchaseItemsForFinance(
+  items: Array<Pick<PurchaseItem, 'ingredientId' | 'grams'> & { price?: number }>,
+): { name: string; grams: number; amount?: number }[] {
   return items
     .filter((item) => item.grams > 0)
-    .map((item) => ({
-      name: getIngredient(item.ingredientId)?.name ?? item.ingredientId,
-      grams: item.grams,
-    }))
+    .map((item) => {
+      const amount =
+        item.price != null && Number.isFinite(item.price) && item.price > 0
+          ? Math.round(item.price * 100) / 100
+          : undefined
+      return {
+        name: getIngredient(item.ingredientId)?.name ?? item.ingredientId,
+        grams: item.grams,
+        ...(amount != null ? { amount } : {}),
+      }
+    })
 }
 
 export async function postMeatPurchase(opts: {
@@ -95,7 +104,7 @@ export async function postMeatPurchase(opts: {
   amount: number
   date: string
   description: string
-  items: { name: string; grams: number }[]
+  items: { name: string; grams: number; amount?: number }[]
   clientMutationId: string
 }): Promise<{ ok: true; transactionId: string } | { ok: false; error: string }> {
   const url = `${normalizeFinanceUrl(opts.baseUrl)}/api/integrations/meat/purchases`

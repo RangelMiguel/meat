@@ -1,8 +1,15 @@
 import { useMemo, useState } from 'react'
-import { Scale, Trash2 } from 'lucide-react'
+import { CalendarRange, Scale, Trash2 } from 'lucide-react'
 import type { AppStore } from '../hooks/useAppStore'
-import { t } from '../i18n'
+import { mealLabel, recipeName, t } from '../i18n'
 import { buildPlan, formatDateLabel } from '../lib/calories'
+import { recipePerServingMacros, scaleMacros } from '../lib/portions'
+import {
+  mondayOf,
+  slotsInWeek,
+  weekDates,
+  weekdayLong,
+} from '../lib/weekPlan'
 import {
   analyzeWeightProgress,
   formatKg,
@@ -11,7 +18,7 @@ import {
   sortWeights,
   type WeightInsight,
 } from '../lib/weightProgress'
-import type { CaloriePlan, Goal, Member } from '../types'
+import { MEAL_ORDER, type CaloriePlan, type Goal, type Member } from '../types'
 import { LogWeightForm } from './LogWeightForm'
 import { WeightChart } from './WeightChart'
 
@@ -20,9 +27,10 @@ interface Props {
   memberId: string
   onSelectMember: (id: string) => void
   onNeedPlan: () => void
+  onGoWeek: () => void
 }
 
-export function ProgressView({ store, memberId, onSelectMember, onNeedPlan }: Props) {
+export function ProgressView({ store, memberId, onSelectMember, onNeedPlan, onGoWeek }: Props) {
   const { locale, household } = store
   const member = household.find((item) => item.id === memberId) ?? household[0] ?? null
   const [flash, setFlash] = useState('')
@@ -92,6 +100,8 @@ export function ProgressView({ store, memberId, onSelectMember, onNeedPlan }: Pr
           ))}
         </div>
       )}
+
+      <WeekPlanProgress store={store} member={member} onGoWeek={onGoWeek} />
 
       <div className="card">
         <div className="card-header">
@@ -207,6 +217,107 @@ export function ProgressView({ store, memberId, onSelectMember, onNeedPlan }: Pr
               ))}
             </ul>
           </div>
+        </>
+      )}
+    </div>
+  )
+}
+
+function WeekPlanProgress({
+  store,
+  member,
+  onGoWeek,
+}: {
+  store: AppStore
+  member: Member
+  onGoWeek: () => void
+}) {
+  const locale = store.locale
+  const weekStart = mondayOf(store.today)
+  const memberSlots = slotsInWeek(store.weekPlan.slots, weekStart).filter(
+    (slot) => slot.memberId === member.id,
+  )
+  const days = weekDates(weekStart)
+  const plannedKcal = memberSlots.reduce((sum, slot) => {
+    const recipe = store.recipeById(slot.recipeId)
+    if (!recipe) return sum
+    return sum + Math.round(recipePerServingMacros(recipe).kcal * slot.servings)
+  }, 0)
+  const weekGoal = (member.plan?.dailyCalories ?? 0) * 7
+
+  return (
+    <div className="card">
+      <div className="card-header">
+        <div>
+          <h4>
+            <CalendarRange size={16} style={{ verticalAlign: '-2px', marginRight: 6 }} />
+            {t(locale, 'weekProgressTitle')}
+          </h4>
+          <p className="sub">{t(locale, 'weekProgressSub')}</p>
+        </div>
+        <button type="button" className="btn btn-ghost btn-sm" onClick={onGoWeek}>
+          {t(locale, 'weekProgressOpen')}
+        </button>
+      </div>
+      {memberSlots.length === 0 ? (
+        <p className="field-hint" style={{ marginTop: 0 }}>
+          {t(locale, 'weekProgressEmpty')}
+        </p>
+      ) : (
+        <>
+          {weekGoal > 0 && (
+            <div className="result-grid" style={{ marginBottom: '0.85rem' }}>
+              <div className="result-tile">
+                <span>{t(locale, 'weekGoal')}</span>
+                <strong>{weekGoal}</strong>
+                <em>kcal</em>
+              </div>
+              <div className="result-tile">
+                <span>{t(locale, 'weekPicked')}</span>
+                <strong>{plannedKcal}</strong>
+                <em>kcal</em>
+              </div>
+              <div className="result-tile">
+                <span>{t(locale, 'dishes')}</span>
+                <strong>{memberSlots.length}</strong>
+                <em>{t(locale, memberSlots.length === 1 ? 'itemOne' : 'itemMany')}</em>
+              </div>
+            </div>
+          )}
+          <ul className="week-progress-days">
+            {days.map((date) => {
+              const daySlots = MEAL_ORDER.map((meal) =>
+                memberSlots.find((slot) => slot.date === date && slot.meal === meal),
+              ).filter(Boolean)
+              return (
+                <li key={date}>
+                  <strong>
+                    {weekdayLong(date, locale)}
+                    {date === store.today ? ` · ${t(locale, 'today')}` : ''}
+                  </strong>
+                  {daySlots.length === 0 ? (
+                    <p>{t(locale, 'weekProgressNoDishes')}</p>
+                  ) : (
+                    daySlots.map((slot) => {
+                      if (!slot) return null
+                      const recipe = store.recipeById(slot.recipeId)
+                      const macros =
+                        recipe && slot
+                          ? scaleMacros(recipePerServingMacros(recipe), slot.servings)
+                          : null
+                      return (
+                        <p key={slot.id}>
+                          {mealLabel(locale, slot.meal)} ·{' '}
+                          {recipe ? recipeName(recipe, locale) : t(locale, 'unknownRecipe')}
+                          {macros ? ` · ${Math.round(macros.kcal)} kcal` : ''}
+                        </p>
+                      )
+                    })
+                  )}
+                </li>
+              )
+            })}
+          </ul>
         </>
       )}
     </div>

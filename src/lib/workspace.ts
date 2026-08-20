@@ -436,6 +436,15 @@ const actionSchema = z.discriminatedUnion('action', [
     spendAmount: z.number().optional(),
     spendNote: z.string().optional(),
     skipFinance: z.boolean().optional(),
+    items: z
+      .array(
+        z.object({
+          id: z.string(),
+          grams: z.number(),
+          price: z.number().optional(),
+        }),
+      )
+      .optional(),
   }),
   z.object({
     action: z.literal('saveFinanceIntegration'),
@@ -578,7 +587,6 @@ export async function mutateWorkspace(userId: string, raw: unknown): Promise<Wor
   const mine = memberOfUser(household, userId)
   if (!mine) throw new BadRequestError('badLogin')
 
-  if (body.action === 'saveWeekPlan') await requireAddon(household.id, 'week')
   if (body.action === 'addExercise' || body.action === 'removeExercise') {
     await requireAddon(household.id, 'exercise')
   }
@@ -1065,33 +1073,62 @@ export async function mutateWorkspace(userId: string, raw: unknown): Promise<Wor
     case 'completePurchaseList': {
       const kitchen = household.kitchen!
       const boughtOn = todayKey()
-      const shopItems = kitchen.purchases.filter((item) => item.grams > 0)
-      for (const item of kitchen.purchases) {
-        const grams = clampGrams(item.grams)
-        if (grams <= 0) continue
+      const listed = kitchen.purchases
+      const adjustments = new Map(
+        (body.items ?? []).map((item) => [item.id, { grams: item.grams, price: item.price }]),
+      )
+      const shopItems = listed
+        .map((item) => {
+          const adj = adjustments.get(item.id)
+          const grams = clampGrams(adj ? adj.grams : item.grams)
+          const price = adj?.price
+          return {
+            id: item.id,
+            ingredientId: item.ingredientId,
+            grams,
+            createdAt: item.createdAt.toISOString(),
+            price: price != null && Number.isFinite(price) && price > 0 ? price : undefined,
+          }
+        })
+        .filter((item) => item.grams > 0 && (!body.items || adjustments.has(item.id)))
+
+      for (const item of shopItems) {
         const existing = kitchen.inventory.find(
           (lot) => lot.ingredientId === item.ingredientId && lot.boughtOn === boughtOn,
         )
         if (existing) {
           await prisma.inventoryItem.update({
             where: { id: existing.id },
-            data: { grams: clampGrams(existing.grams + grams) },
+            data: { grams: clampGrams(existing.grams + item.grams) },
           })
         } else {
           await prisma.inventoryItem.create({
             data: {
               kitchenId: kitchen.id,
               ingredientId: item.ingredientId,
-              grams,
+              grams: item.grams,
               boughtOn,
             },
           })
         }
       }
-      await prisma.purchaseItem.deleteMany({ where: { kitchenId: kitchen.id } })
+
+      if (body.items) {
+        const boughtIds = shopItems.map((item) => item.id)
+        if (boughtIds.length) {
+          await prisma.purchaseItem.deleteMany({
+            where: { kitchenId: kitchen.id, id: { in: boughtIds } },
+          })
+        }
+      } else {
+        await prisma.purchaseItem.deleteMany({ where: { kitchenId: kitchen.id } })
+      }
 
       const finance = parseFinanceLink(safeJson(kitchen.integrationsJson))
-      const amount = Number(body.spendAmount)
+      const pricedTotal = shopItems.reduce((sum, item) => sum + (item.price ?? 0), 0)
+      const amount = Number.isFinite(Number(body.spendAmount))
+        ? Number(body.spendAmount)
+        : pricedTotal
       const shouldSend =
         !body.skipFinance &&
         finance.enabled &&
@@ -1099,14 +1136,7 @@ export async function mutateWorkspace(userId: string, raw: unknown): Promise<Wor
         Number.isFinite(amount) &&
         amount > 0
       if (shouldSend) {
-        const items = purchaseItemsForFinance(
-          shopItems.map((item) => ({
-            id: item.id,
-            ingredientId: item.ingredientId,
-            grams: item.grams,
-            createdAt: item.createdAt.toISOString(),
-          })),
-        )
+        const items = purchaseItemsForFinance(shopItems)
         const note = body.spendNote?.trim()
         const result = await postMeatPurchase({
           baseUrl: finance.baseUrl,

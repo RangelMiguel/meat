@@ -13,7 +13,7 @@ const MODULE_COPY: Record<AppModuleId, { title: MsgId; body: MsgId } | undefined
   inventory: undefined,
   purchase: undefined,
   settings: undefined,
-  week: { title: 'moduleWeekTitle', body: 'moduleWeekBody' },
+  week: undefined,
   exercise: { title: 'moduleExerciseTitle', body: 'moduleExerciseBody' },
   history: { title: 'moduleHistoryTitle', body: 'moduleHistoryBody' },
   ai: undefined,

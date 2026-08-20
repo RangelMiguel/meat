@@ -5,6 +5,7 @@ import {
   Plus,
   Search,
   ShoppingCart,
+  Shuffle,
   Snowflake,
   Trash2,
   UtensilsCrossed,
@@ -34,11 +35,11 @@ import {
 } from '../lib/portions'
 import {
   addDays,
+  buildRandomWeekPlan,
   buildWeekShopping,
   mondayOf,
   slotsInWeek,
   storageLines,
-  upcomingSlots,
   weekDates,
   weekdayLong,
   weekRangeLabel,
@@ -76,10 +77,7 @@ export function WeekPlanView({ store, memberId, onSelectMember, onNeedPlan, onGo
     () => weekSlotList.filter((slot) => slot.memberId === member?.id),
     [weekSlotList, member?.id],
   )
-  const shopSlots = useMemo(
-    () => upcomingSlots(weekSlotList, weekStart, today),
-    [weekSlotList, weekStart, today],
-  )
+  const shopSlots = weekSlotList
   const days = useMemo(() => weekDates(weekStart), [weekStart])
 
   const shopping = useMemo(
@@ -89,9 +87,9 @@ export function WeekPlanView({ store, memberId, onSelectMember, onNeedPlan, onGo
         recipesById: store.recipeById,
         gramsOnHand: store.gramsOnHand,
         purchaseList: store.purchaseList,
-        shopDate: today >= weekStart ? today : weekStart,
+        shopDate: weekStart,
       }),
-    [shopSlots, store.recipeById, store.gramsOnHand, store.purchaseList, today, weekStart],
+    [shopSlots, store.recipeById, store.gramsOnHand, store.purchaseList, weekStart],
   )
 
   const toAdd = shopping.filter((item) => item.addGrams > 0)
@@ -155,6 +153,23 @@ export function WeekPlanView({ store, memberId, onSelectMember, onNeedPlan, onGo
     if (toAdd.length === 0) return
     store.addToPurchaseList(toAdd.map((item) => ({ ingredientId: item.ingredientId, grams: item.addGrams })))
     setAdded(true)
+  }
+
+  const fillRandomWeek = () => {
+    if (!member || !plan) return
+    if (memberSlots.length > 0 && !confirm(t(locale, 'randomWeekConfirm'))) return
+    const generated = buildRandomWeekPlan({
+      weekStart,
+      memberId: member.id,
+      dailyCalories: plan.dailyCalories,
+      recipes: store.recipes,
+    })
+    if (generated.length === 0) return
+    const keep = slots.filter((slot) => {
+      const inWeek = slot.date >= weekStart && slot.date <= addDays(weekStart, 6)
+      return !(inWeek && slot.memberId === member.id)
+    })
+    persist([...keep, ...generated])
   }
 
   const planners = useMemo(() => {
@@ -252,13 +267,17 @@ export function WeekPlanView({ store, memberId, onSelectMember, onNeedPlan, onGo
             <ChevronRight size={18} />
           </button>
         </div>
-        {memberSlots.length > 0 && (
-          <div className="week-nav-actions">
+        <div className="week-nav-actions">
+          <button type="button" className="btn btn-secondary btn-sm" onClick={fillRandomWeek}>
+            <Shuffle size={14} />
+            {t(locale, 'randomWeek')}
+          </button>
+          {memberSlots.length > 0 && (
             <button type="button" className="btn btn-ghost btn-sm" onClick={clearWeek}>
               {t(locale, 'clearWeek')}
             </button>
-          </div>
-        )}
+          )}
+        </div>
       </div>
 
       {weekGoal > 0 && (
@@ -266,7 +285,7 @@ export function WeekPlanView({ store, memberId, onSelectMember, onNeedPlan, onGo
           <div className="card-header">
             <div>
               <h4>{t(locale, 'weekTotals')}</h4>
-              <p className="sub">{t(locale, 'editPlanFor', { name: member.name })}</p>
+              <p className="sub">{t(locale, 'weekPickedHint')}</p>
             </div>
           </div>
           <div className="result-grid">
@@ -291,9 +310,8 @@ export function WeekPlanView({ store, memberId, onSelectMember, onNeedPlan, onGo
 
       <div className="week-days">
         {days.map((date) => {
-          const past = date < today
           return (
-            <div key={date} className={`card week-day${past ? ' is-past' : ''}`}>
+            <div key={date} className="card week-day">
               <div className="week-day-head">
                 <strong>{weekdayLong(date, locale)}</strong>
                 {date === today && <span className="badge badge-neutral">{t(locale, 'today')}</span>}
@@ -464,7 +482,7 @@ export function WeekPlanView({ store, memberId, onSelectMember, onNeedPlan, onGo
             </div>
             <p className="field-hint" style={{ marginTop: 0 }}>
               {t(locale, 'weekShopHint', {
-                date: weekdayLong(today >= weekStart ? today : weekStart, locale),
+                date: weekdayLong(weekStart, locale),
               })}
             </p>
             <ul className="storage-list">

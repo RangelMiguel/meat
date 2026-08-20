@@ -38,7 +38,7 @@ export const APP_MODULES: AppModuleDef[] = [
   { id: 'purchase', kind: 'core', view: 'purchase', priceCents: 0 },
   { id: 'settings', kind: 'core', view: 'settings', priceCents: 0 },
   { id: 'ai', kind: 'core', view: 'ai', priceCents: 0 },
-  { id: 'week', kind: 'addon', view: 'week', priceCents: 0 },
+  { id: 'week', kind: 'core', view: 'week', priceCents: 0 },
   { id: 'exercise', kind: 'addon', view: 'exercise', priceCents: 0 },
   { id: 'history', kind: 'addon', view: 'history', priceCents: 0 },
 ]

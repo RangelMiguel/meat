@@ -602,7 +602,12 @@ export function useAppStore() {
   )
 
   const completePurchaseList = useCallback(
-    (input?: { spendAmount?: number; spendNote?: string; skipFinance?: boolean }) => {
+    (input?: {
+      spendAmount?: number
+      spendNote?: string
+      skipFinance?: boolean
+      items?: { id: string; grams: number; price?: number }[]
+    }) => {
       void mutate({ action: 'completePurchaseList', ...input })
     },
     [mutate],

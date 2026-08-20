@@ -69,10 +69,7 @@ export default function App() {
 
   useEffect(() => {
     if (!store.isLoggedIn) return
-    if (
-      (view === 'week' || view === 'exercise' || view === 'history') &&
-      !store.hasModule(view)
-    ) {
+    if ((view === 'exercise' || view === 'history') && !store.hasModule(view)) {
       goTo('marketplace')
     }
   }, [view, store.installedModules, store.isLoggedIn, store.hasModule])
@@ -147,9 +144,23 @@ export default function App() {
                     existing={planMember.plan}
                     onSave={(plan) => {
                       store.savePlan(plan, planMember.id)
-                      goTo(store.hasModule('week') ? 'week' : 'today')
                     }}
                   />
+                )}
+                {planMember?.plan && (
+                  <div className="card">
+                    <div className="card-header">
+                      <div>
+                        <h4>{t(locale, 'planWeekCtaTitle')}</h4>
+                        <p className="sub">{t(locale, 'planWeekCtaBody')}</p>
+                      </div>
+                    </div>
+                    <div className="btn-row">
+                      <button type="button" className="btn btn-primary" onClick={() => goTo('week')}>
+                        {t(locale, 'planWeekCta')}
+                      </button>
+                    </div>
+                  </div>
                 )}
                 {planMember?.plan && (
                   <div className="card danger-zone">
@@ -178,6 +189,7 @@ export default function App() {
                 memberId={planMember?.id ?? ''}
                 onSelectMember={setPlanMemberId}
                 onNeedPlan={() => goTo('plan')}
+                onGoWeek={() => goTo('week')}
               />
             )}
             {view === 'week' && (
